@@ -1,0 +1,22 @@
+{
+  "name": "Grampus",
+  "version": "v0.2.0",
+  "type": "TOOL",
+  "description": "ORCA-inspired grid sequencer paired with 5 built-in polyphonic synth engines: Drifter (dual-osc analog), Warper (wavetable), BrokenFM (6-operator FM), String (Karplus), and ROMpler (15 sample kits). 8 tracks, per-track LFOs and effects, master delay and reverb, WAV recording. Projects, recordings, and bundled demos live in the Grampus folder at the root of your SD Card. Full operator and instrument reference in MANUAL.md at https://github.com/boorch/grampus-pak/blob/main/MANUAL.md — desktop builds (macOS / Linux / Windows) at https://boorch.itch.io/grampus.",
+  "author": "boorch (Bruce Menace/Cometary Trails)",
+  "repo_url": "https://github.com/boorch/grampus-pak",
+  "release_filename": "Grampus.pak.zip",
+  "platforms": ["tg5040"],
+  "features": [
+    "Grid sequencer with 30+ operators (Orca-c / bOrca derived)",
+    "5 polyphonic synth engines + per-track filter, drive, chorus, tone EQ",
+    "8 tracks, 3 LFOs per track, modulation matrix",
+    "15 ROM kits: 909, 808, REALDRUM, AMEN break, piano, rhodes, and more",
+    "Master delay + reverse delay + reverb with shimmer",
+    "WAV recording with automatic peak normalization to -3 dBFS",
+    "Bundled demo projects, switchable themes per project"
+  ],
+  "screenshots": [
+    ".github/screenshots/splash.jpg"
+  ]
+}
