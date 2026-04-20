@@ -1,5 +1,13 @@
 # Grampus
 
+## ⚠️ IF YOU NEED ONE PIECE OF INFO, IT'S THIS ⚠️
+
+# **Press `Ctrl+H` (keyboard) or `R1+Select` (gamepad) to open the in-app HELP POPUP.**
+
+**It lists every keyboard shortcut, gamepad combo, and mode binding.**
+
+---
+
 A terminal application that pairs an **[Orca](https://github.com/hundredrabbits/Orca-c)-style grid sequencer** with **built-in synth engines**. You write procedural music by placing single-character glyphs on a 2D grid; those glyphs drive polyphonic voices and effects rendered in real time through your audio output.
 
 Grampus runs on macOS, Linux, Windows, and small-form-factor Linux handhelds. It works in terminals as small as 78×30.
@@ -468,7 +476,20 @@ Used by both `$` (indices 10-35) and `=` (indices a-z / A-Z):
 | 34 | `y` | Minor11 | 0 3 7 10 17 |
 | 35 | `z` | Minor7♭5 | 0 3 6 10 |
 
-For `=`, indices 0-9 are **enriched** chord variants with octave doublings (e.g., `0` = Major + octave = C-E-G-C, `4` = Major7 + 3rd-octave = C-E-G-B-E, `6` = Dom7 + 5th-octave = C-E-G-B♭-G).
+For `=`, indices `0`-`9` are **octave-thickened** voicings — triads fattened with octaves above/below the root, then progressively reduced down to pure octave stacks. The pattern: Up / Down / Both → fifth → power → octave pair → octave triple. Negative intervals shift below the root; if the root is too low, the note octaves up to stay in MIDI range (clamping is symmetric for high-octave overflow).
+
+| Index | Glyph | Voicing | Intervals |
+|-------|-------|---------|-----------|
+| 0 | `0` | Major + OctUp | 0 4 7 12 |
+| 1 | `1` | Minor + OctUp | 0 3 7 12 |
+| 2 | `2` | Major + OctDown | -12 0 4 7 |
+| 3 | `3` | Minor + OctDown | -12 0 3 7 |
+| 4 | `4` | Major Spread | 0 7 12 16 |
+| 5 | `5` | Minor Spread | 0 7 12 15 |
+| 6 | `6` | Fifth | 0 7 |
+| 7 | `7` | Power (Fifth + OctUp) | 0 7 12 |
+| 8 | `8` | OctPair | 0 12 |
+| 9 | `9` | OctTriple | -12 0 12 |
 
 ---
 
@@ -500,7 +521,7 @@ Same ports as `;`, but monophonic: any existing note on the track is stolen imme
 
 ##### `=` - Midichord
 
-Plays an entire chord in one tick on a synth channel. Uses the chord table above, with enriched variants at indices 0-9 and first inversions at A-Z.
+Plays an entire chord in one tick on a synth channel. Uses the chord table above (a-z root position, A-Z first inversion) plus the octave-thickened voicings at indices 0-9.
 
 | Operator | Channel | Octave | Root | Chord | Velocity | Length |
 |:--------:|:-------:|:------:|:----:|:-----:|:--------:|:------:|
@@ -741,7 +762,8 @@ Every voice, regardless of type, passes through the same chain:
 
 - **AHD envelope** (params 10-12: AmpAtk / AmpHld / AmpDcy)
   - Custom time curve: hand-picked 0-12 (10 ms → 750 ms), exponential 13-35 (1 s → 24 s).
-  - Hold = 0 gives **gate-based sustain**: level stays at peak until the sequencer sends NoteOff.
+  - **`AmpHld = 0` → INF (gate mode)**: level stays at peak until note-off arrives, then Decay runs. Default. Use for sustained notes, pads, leads.
+  - **`AmpHld = 1..z` → AHD (auto-decay)**: Atk → Hld (dwell) → Dcy fires automatically regardless of note length. Use for drums, plucks, blips — the envelope shape defines the sound duration.
 - **True-stereo MultiFilter** (params 13-15: FltTyp / FltCut / FltRes) - independent L/R filter instances:
   - 0 Off (passthrough)
   - 1 **Moog LP** (4-pole ladder, 24 dB/oct)
@@ -831,28 +853,31 @@ Every parameter set via `!` in the grid is marked as **sequencer-controlled** (s
 - **Save / load** - `.grampus` file format containing grid, all track params, master params, BPM, seed, tick rate, and shuffle. Plain human-readable text. Backward compatible — files from older versions without a `SHUFFLE` field load cleanly with shuffle defaulted to 50% (straight).
 - **WAV recording** - `F10` (or R1+Start on the gamepad) toggles recording of the master output to `data_dir/recordings/<project>_<YYYYMMDD_HHMMSS>.wav`. 16-bit PCM stereo with TPDF dithering, headers patched after every chunk so the file is always valid even mid-take.
 - **Toggle comment region** - Algorave style live mute (typical trick for Tidal Cycles/Strudel). Make a selection, press `/` (or L1+R1 on the gamepad), and grampus wraps each row of the rect with `#` (ORCA's comment operator) - silencing everything between. Press again on a wrapped selection to clear the `#`s. Refuses to overwrite real glyphs at the edges.
-- **Envelopes** - the amp and filter envelopes choose their shape based on the note's duration, so a single set of params covers both percussion and pads.
-  - **`len = 0` (trigger)** → one-shot **AHD**: Attack → Hold (peak dwell) → Decay, all automatic. `Hold` is the dwell time at peak before Decay starts. Use this for drum hits, plucks, blips - anything where the envelope itself defines the sound's length.
-  - **`len > 0` (sustained)** → **ASR**: Attack → Sustain (held at peak) → Decay (on note-off). `Hold` is ignored. The note's length controls how long the sound holds before tailing off. Use this for pads, leads, anything where the operator's duration port is the natural body length.
-  - This applies to both the **amp envelope** (`Amp Atk/Hld/Dcy`, params A/B/C) and the **filter envelope** (`FEnv Atk/Hld/Dcy`, params H/I/J). Same param slots, behavior just switches based on how the operator triggered the note.
-  - **Time per value** - every Atk/Hld/Dcy slot reads its base-36 glyph through this table:
+- **Envelopes** — the amp envelope and filter envelope each have three stages: Attack, Hold, Decay. Both follow the same rule: the **Hold value** determines the entire shape, independently of note length.
 
-    | Glyph | Time | | Glyph | Time | | Glyph | Time |
-    |:-----:|------|---|:-----:|------|---|:-----:|------|
-    | `0`   | instant¹ | | `c`   | 200 ms | | `o`   | 2.5 s |
-    | `1`   | 2.5 ms   | | `d`   | 250 ms | | `p`   | 3 s |
-    | `2`   | 5 ms     | | `e`   | 300 ms | | `q`   | 4 s |
-    | `3`   | 10 ms    | | `f`   | 350 ms | | `r`   | 5 s |
-    | `4`   | 20 ms    | | `g`   | 400 ms | | `s`   | 6 s |
-    | `5`   | 30 ms    | | `h`   | 500 ms | | `t`   | 7.5 s |
-    | `6`   | 50 ms    | | `i`   | 600 ms | | `u`   | 10 s |
-    | `7`   | 75 ms    | | `j`   | 750 ms | | `v`   | 12.5 s |
-    | `8`   | 100 ms   | | `k`   | 1 s    | | `w`   | 16 s |
-    | `9`   | 125 ms   | | `l`   | 1.25 s | | `x`   | 20 s |
-    | `a`   | 150 ms   | | `m`   | 1.5 s  | | `y`   | 24 s |
-    | `b`   | 175 ms   | | `n`   | 2 s    | | `z`   | 32 s |
+  - **`Hld = 0` → INF (gate mode)**: Attack → **Sustain** (level held at peak) → Decay on note-off. The note's operator length controls when note-off fires and Decay begins. Default for both envelopes. Use for pads, leads, sustained filter sweeps.
+  - **`Hld = 1..z` → AHD (auto-decay)**: Attack → **Hold** (dwell for the specified time) → Decay fires automatically, regardless of note length. The envelope completes its full shape even while the voice is still sounding. Use for drums, plucks, or to put a rhythmic filter sweep on a long sustained pad.
 
-    ¹ Value `0` is clamped internally to ~1 ms - for Atk / Dcy that's an instant transition; for Hld in oneshot mode it skips the dwell stage.
+  These two modes apply **independently** to the amp and filter envelopes, so you can mix and match freely. Example: `AmpHld = 0` (INF — voice holds for the full note) + `FEnvHld = h` (500 ms auto-AHD filter sweep that opens and closes mid-note).
+
+  **Trigger notes (operator length = 0)** always use auto-AHD on both envelopes regardless of the Hld value, since no note-off ever arrives for them.
+
+  This applies to both the **amp envelope** (`AmpAtk / AmpHld / AmpDcy`, params A/B/C) and the **filter envelope** (`FEnvAt / FEnvHl / FEnvDc`, params H/I/J).
+
+  - **Time per value** — every Atk/Hld/Dcy slot reads its base-36 glyph through this table. For **Hld only, value `0` is the special INF marker** (not a time); for Atk and Dcy, `0` means instant (~1 ms internally):
+
+    | Glyph | Atk / Dcy time | Hld | | Glyph | Atk / Dcy time | Hld |
+    |:-----:|----------------|-----|---|:-----:|----------------|-----|
+    | `0`   | instant (~1 ms) | **INF** | | `i`   | 600 ms | 600 ms |
+    | `1`   | 2.5 ms  | 2.5 ms  | | `j`   | 750 ms | 750 ms |
+    | `2`   | 5 ms    | 5 ms    | | `k`   | 1 s    | 1 s    |
+    | `3`   | 10 ms   | 10 ms   | | `l`   | 1.25 s | 1.25 s |
+    | `4`   | 20 ms   | 20 ms   | | `m`   | 1.5 s  | 1.5 s  |
+    | `5`   | 30 ms   | 30 ms   | | `n`   | 2 s    | 2 s    |
+    | `6`   | 50 ms   | 50 ms   | | `o`   | 2.5 s  | 2.5 s  |
+    | `7`   | 75 ms   | 75 ms   | | `p`–`z` | 3–32 s | 3–32 s |
+    | `8`   | 100 ms  | 100 ms  | | | | |
+    | `a`–`h` | 150–500 ms | 150–500 ms | | | | |
 
 ---
 
