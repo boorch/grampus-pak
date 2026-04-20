@@ -106,6 +106,7 @@ A few symbol operators run every tick unconditionally regardless of banging: `#`
 
 - **BPM** drives the base tempo.
 - **TickRate** multiplies the division: `Half` = 2 ticks/beat, `Normal` = 4 ticks/beat, `Double` = 8 ticks/beat.
+- **Shuffle** (25–75%, default 50%) adds swing by displacing every odd-numbered tick (the 2nd, 4th, 6th, … tick after `Reset`). 50% = straight, classic forward swing lives around 60–67%, values below 50% pull the offbeat earlier (anticipated / reverse swing). The pair-average BPM is preserved, so external sync stays on grid; only the within-pair phase moves. Reset always restarts cleanly from tick 0 (an even tick, never displaced).
 
 ### Operator reference
 
@@ -827,7 +828,7 @@ Every parameter set via `!` in the grid is marked as **sequencer-controlled** (s
 - **Themes** - 14 built-in: Default, Catppuccin, Draculish, Gruvbox, Nord, Solarized, Tokyo Night, Amber, Crimson, GB, GB Inv, Mono, 1991, Goodnight. Selection persists across sessions.
 - **Gamepad** - first-class controller support, designed around grid-editing ergonomics. D-pad navigation, shoulder combos for cut/copy/paste/undo, on-screen keyboard for glyph entry on the Sequencer screen. On instrument pages, hold South + D-pad for the same param-adjust deltas as Shift+Arrow on desktop.
 - **On-screen keyboard** - available on the Sequencer screen for handheld / no-keyboard use. Instrument pages use Shift+Arrow / South+D-pad and (on desktop) direct alphanumeric entry.
-- **Save / load** - `.grampus` file format containing grid, all track params, master params, BPM, seed, and tick rate. Plain human-readable text.
+- **Save / load** - `.grampus` file format containing grid, all track params, master params, BPM, seed, tick rate, and shuffle. Plain human-readable text. Backward compatible — files from older versions without a `SHUFFLE` field load cleanly with shuffle defaulted to 50% (straight).
 - **WAV recording** - `F10` (or R1+Start on the gamepad) toggles recording of the master output to `data_dir/recordings/<project>_<YYYYMMDD_HHMMSS>.wav`. 16-bit PCM stereo with TPDF dithering, headers patched after every chunk so the file is always valid even mid-take.
 - **Toggle comment region** - Algorave style live mute (typical trick for Tidal Cycles/Strudel). Make a selection, press `/` (or L1+R1 on the gamepad), and grampus wraps each row of the rect with `#` (ORCA's comment operator) - silencing everything between. Press again on a wrapped selection to clear the `#`s. Refuses to overwrite real glyphs at the edges.
 - **Envelopes** - the amp and filter envelopes choose their shape based on the note's duration, so a single set of params covers both percussion and pads.
