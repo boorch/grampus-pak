@@ -30,6 +30,7 @@ Grampus runs on macOS, Linux, Windows, and small-form-factor Linux handhelds. It
   - [BrokenFM (EngType 2)](#brokenfm-engtype-2)
   - [String / Karplus (EngType 3)](#string--karplus-engtype-3)
   - [ROMpler (EngType 4)](#rompler-engtype-4)
+  - [LoFiTron (EngType 5)](#lofitron-engtype-5)
 - [Shared voice chain](#shared-voice-chain)
 - [Master effects bus](#master-effects-bus)
 - [Parameter system](#parameter-system)
@@ -714,29 +715,31 @@ Character: plucked, struck, bell-like. Very responsive to velocity (boosts brigh
 
 ### ROMpler (EngType 4)
 
-Sample-playback engine. Drum kits and pitched instruments share the same 5-parameter interface; the shipped kits cover both. Pitch zones are auto-constructed from the samples in each kit, so any note you play picks the closest sample and pitches it from there. No interpolation - nearest-neighbour reads, tracker-style, with character (audible aliasing on extreme upward shifts).
+Sample-playback engine. Drum kits and pitched instruments share the same 6-parameter interface; the shipped kits cover both. Pitch zones are auto-constructed from the samples in each kit, so any note you play picks the closest sample and pitches it from there. Linear interpolation between adjacent samples keeps pitch shifts clean across the playable range; the `8bit` toggle is the place to add lo-fi character on demand.
 
 > **Drum kits and per-octave sample switching.** For the drum-focused kits (`909`, `808`, `REALDRUM`, `AMEN`), each kit slot occupies a full octave. `C` plays the original (unpitched) sample; every other note up to (but not including) the next `C` is the same sample pitched. So `C..B` in octave 3 is one sample (pitched up across the octave), and `C` in octave 4 picks the next slot's sample. This makes it easy to lay drums out chromatically — pick the kick at one `C`, snare at the next `C`, hats at the next, etc.
 
-**Shipped kits (15)**, indexed by ROM 0..14:
+**Shipped kits (17)**, indexed by ROM 0..16:
 
 | ROM | Name | Type |
 |-----|------|------|
-| 0 | 909 | Drum machine |
-| 1 | 808 | Drum machine |
+| 0 | 909 | Drum machine (40 kHz MPC-style bake) |
+| 1 | 808 | Drum machine (40 kHz MPC-style bake) |
 | 2 | REALDRUM | Acoustic drum kit |
-| 3 | AMEN | Classic break (sliced) |
+| 3 | AMEN | Classic break, sliced (40 kHz MPC-style bake) |
 | 4 | PIANO | Pitched, multi-sampled |
-| 5 | RHODES | Pitched, multi-sampled |
-| 6 | HAMMOND | Pitched, looped |
-| 7 | STRINGS | Pitched, looped |
-| 8 | BRASS | Pitched, looped |
-| 9 | GUITAR | Pitched, multi-sampled |
-| 10 | SINE | Chromatic 7-octave waveform bank, looped |
-| 11 | TRIANGLE | Chromatic 7-octave waveform bank, looped |
-| 12 | SQUARE | Chromatic 7-octave waveform bank, looped |
-| 13 | SAW | Chromatic 7-octave waveform bank, looped |
-| 14 | NOISYSAW | Chromatic 7-octave waveform bank, looped (noisy variant) |
+| 5 | PIASOFT | Soft-pressed piano, multi-sampled (24 kHz) |
+| 6 | RHODES | Pitched, multi-sampled |
+| 7 | HAMMOND | Pitched, looped |
+| 8 | STRINGS | Pitched, looped |
+| 9 | BRASS | Pitched, looped |
+| 10 | GUITAR | Pitched, multi-sampled |
+| 11 | SINE | Chromatic 7-octave waveform bank, looped |
+| 12 | TRIANGLE | Chromatic 7-octave waveform bank, looped |
+| 13 | SQUARE | Chromatic 7-octave waveform bank, looped |
+| 14 | SAW | Chromatic 7-octave waveform bank, looped |
+| 15 | NOISYSAW | Chromatic 7-octave waveform bank, looped (noisy variant) |
+| 16 | ZEN | Sustained pad with augmented-triad sample roots (24 kHz) |
 
 | # | Name | Role |
 |---|------|------|
@@ -745,14 +748,37 @@ Sample-playback engine. Drum kits and pitched instruments share the same 5-param
 | 3 | Tune | Fine tune ±50 cents. |
 | 4 | Reverse | 0 = forward, 1 = reversed playback. |
 | 5 | VelCut | Velocity → filter cutoff modulator. Bipolar. `h` = no effect. Stacks with FltCut, FEnvAm, and any LFOs that target FltCut. |
+| 6 | 8bit | 0 = clean, 1 = quantise output to 8-bit (256 levels). Live bitcrush — applied AFTER pitch shifting so it crunches the audible signal, not the source data. |
 
 Note-off behaviour depends on the kit:
 - **Drum / one-shot kits**: note-off is ignored, the sample plays through. If you want the tail cut, use the Amp envelope (`AmpHld` / `AmpDcy`).
 - **Pitched / looped kits**: note-off triggers the standard Amp envelope release.
 
-**Live pitch / tune modulation**: `Pitch` (slot 2) and `Tune` (slot 3) recompute the playback rate every time they change during a sustained note, so they respond to LFO mod, `!` operator writes, and `!`-with-interpolation lerps in real time. This lets you build pitch envelopes (one-shot LFO on Tune or Pitch) and smooth pitch glides (`!` on Pitch with interpolation > 0). Static patches (no modulation) behave identically to before - the per-note rate is still latched at note-on; only the live-update path is new.
+**Live pitch / tune modulation**: `Pitch` (slot 2) and `Tune` (slot 3) recompute the playback rate every time they change during a sustained note, so they respond to LFO mod, `!` operator writes, and `!`-with-interpolation lerps in real time. This lets you build pitch envelopes (one-shot LFO on Tune or Pitch) and smooth pitch glides (`!` on Pitch with interpolation > 0). Static patches (no modulation) behave identically to before — the per-note rate is still latched at note-on; only the live-update path is new.
 
 Character: classic sampler. Drum kits hit hard; pitched instruments stretch through pitch zones with that "tape-slowed" character at extremes.
+
+---
+
+### LoFiTron (EngType 5)
+
+A 1:1 clone of ROMpler, reading from a separate **TAPE** pool instead of the ROM pool. Same parameter interface, same engine code, same pitch / tune / reverse / VelCut / 8bit behaviour — slot 1 is just labelled `TAPE` (not `ROM`) and the discrete selector picks from a different list of baked sample sets.
+
+The intent is to keep two independent sample banks that you can mix and match per track without fighting for ROM slots: ROMpler tends to hold drums + clean melodic content, LoFiTron tends to hold lo-fi sustained / atmospheric material baked at lower rates (24 kHz default) for character. Nothing prevents either pool from being whatever you want it to be.
+
+**Shipped TAPEs (7)**, indexed by TAPE 0..6 (all baked 16-bit / 24 kHz, sparsely sampled per kit at minor-third intervals to keep the binary lean):
+
+| TAPE | Name | Type |
+|------|------|------|
+| 0 | XTRINGS | Wide-range string layer mix, looped |
+| 1 | 3VIOLINS | Three-violin layer, looped |
+| 2 | ORGAN | Sustained organ, looped |
+| 3 | VIBES | Vibraphone, one-shot natural decay |
+| 4 | CHOIRMIX | Choir layer mix, looped |
+| 5 | BRASS | Soft brass layer, looped |
+| 6 | FLUTE | Flute, looped |
+
+The TAPE selector and ROM selector are independent — adding a TAPE never bumps a ROM index, and vice versa. Save files record the selection by stable name, so reordering either pool in a future build doesn't silently remap existing projects.
 
 ---
 
@@ -810,7 +836,7 @@ The sequencer and the synth share one language: **36 base-36 parameter slots per
 
 | ID | Name | Notes |
 |----|------|-------|
-| 0 | EngType | 0 = Drifter, 1 = Warper, 2 = BrokenFM, 3 = String, 4 = ROMpler |
+| 0 | EngType | 0 = Drifter, 1 = Warper, 2 = BrokenFM, 3 = String, 4 = ROMpler, 5 = LoFiTron |
 | 1-9 | Oscillator-specific | Names change per engine (see above). BrokenFM only uses 1-5; rest are skipped. |
 | 10-12 | AmpAtk / AmpHld / AmpDcy | Amplitude envelope |
 | 13-15 | FltTyp / FltCut / FltRes | Filter |
