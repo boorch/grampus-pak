@@ -739,7 +739,7 @@ Sample-playback engine. Drum kits and pitched instruments share the same 6-param
 | 13 | SQUARE | Chromatic 7-octave waveform bank, looped |
 | 14 | SAW | Chromatic 7-octave waveform bank, looped |
 | 15 | NOISYSAW | Chromatic 7-octave waveform bank, looped (noisy variant) |
-| 16 | ZEN | Sustained pad with augmented-triad sample roots (24 kHz) |
+| 16 | ZEN | Sustained pad, looped (24 kHz) |
 
 | # | Name | Role |
 |---|------|------|
