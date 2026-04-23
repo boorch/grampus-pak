@@ -765,11 +765,11 @@ Character: classic sampler. Drum kits hit hard; pitched instruments stretch thro
 
 ### LoFiTron (EngType 5)
 
-A 1:1 clone of ROMpler, reading from a separate **TAPE** pool instead of the ROM pool. Same parameter interface, same engine code, same pitch / tune / reverse / VelCut / 8bit behaviour, slot 1 is just labelled `TAPE` (not `ROM`) and the discrete selector picks from a different list of baked sample sets.
+A 1:1 clone of ROMpler, reading from a separate **TAPE** pool instead of the ROM pool. Same parameter interface, same pitch / tune / reverse / VelCut / 8bit behaviour, slot 1 is just labelled `TAPE` (not `ROM`) and the discrete selector picks from a separate sample pool.
 
-The intent is to keep two independent sample banks that you can mix and match per track without fighting for ROM slots: ROMpler tends to hold drums + clean melodic content, LoFiTron tends to hold lo-fi sustained / atmospheric material baked at lower rates (24 kHz default) for character. Nothing prevents either pool from being whatever you want it to be.
+The intent is to keep two independent sample banks that you can mix and match per track without fighting for ROM slots: ROMpler tends to hold drums + clean melodic content, LoFiTron tends to hold lo-fi sustained / atmospheric material with a darker, downsampled character.
 
-**Shipped TAPEs (7)**, indexed by TAPE 0..6 (all baked 16-bit / 24 kHz, sparsely sampled per kit at minor-third intervals to keep the binary lean):
+**Shipped TAPEs (7)**, indexed by TAPE 0..6:
 
 | TAPE | Name | Type |
 |------|------|------|
@@ -781,18 +781,18 @@ The intent is to keep two independent sample banks that you can mix and match pe
 | 5 | BRASS | Soft brass layer, looped |
 | 6 | FLUTE | Flute, looped |
 
-The TAPE selector and ROM selector are independent, adding a TAPE never bumps a ROM index, and vice versa. Save files record the selection by stable name, so reordering either pool in a future build doesn't silently remap existing projects.
+The TAPE selector and ROM selector are independent, adding a TAPE never bumps a ROM index, and vice versa.
 
 ---
 
 ### WaveSurf (EngType 6)
 
-A 2D wavetable morph engine. Picks two wavetables from the baked pool, scans through frames in each, and crossfades between them to produce an evolving terrain. Spiritual descendant of Korg Wavestation / Sequential Prophet VS vector synthesis, where each "corner" is a fully scannable wavetable rather than a static waveform.
+A 2D wavetable morph engine. Picks two wavetables from the available pool, scans through frames in each, and crossfades between them to produce an evolving terrain. Spiritual descendant of Korg Wavestation / Sequential Prophet VS vector synthesis, where each "corner" is a fully scannable wavetable rather than a static waveform.
 
 | ID | Slot | Notes |
 |----|------|-------|
-| 1 | WaveX | Discrete picker, selects a wavetable from `ALL_WAVETABLES` |
-| 2 | WaveY | Discrete picker, selects a wavetable from `ALL_WAVETABLES` |
+| 1 | WaveX | Picks one of the available wavetables |
+| 2 | WaveY | Picks one of the available wavetables |
 | 3 | ScanX | Frame position inside WaveX (`0` = first frame, `z` = last frame) |
 | 4 | ScanY | Frame position inside WaveY, doubles as the X↔Y morph weight |
 | 5 | PitchX | Per-axis pitch offset for WaveX (bipolar ±17 semitones, `h` = unison) |
@@ -800,7 +800,7 @@ A 2D wavetable morph engine. Picks two wavetables from the baked pool, scans thr
 
 **Asymmetric bilinear morph**: at `ScanY = 0` you hear pure `WaveX` at frame `ScanX`; at `ScanY = z` you hear pure `WaveY` at its last frame. Sweeping `ScanY` simultaneously scans through `WaveY`'s frames AND morphs from X to Y. ScanX is independent, it only selects which frame of WaveX is in the mix.
 
-**One-pole smoothing on all scan/wave params at audio rate** so base-36 modulation (e.g. `!` writes from the sequencer every tick) glides between values rather than zippering. Hardcoded ~50 ms time constant; if it ever needs user control, it'll get a dedicated slot.
+**Smooth modulation**: all scan/wave params smooth at audio rate (~50 ms time constant) so base-36 modulation (e.g. `!` writes from the sequencer every tick) glides between values rather than zippering.
 
 **Wavetable swaps** (changing WaveX or WaveY) crossfade over ~10 ms instead of cutting. Mid-note picker changes are click-free.
 
@@ -809,23 +809,6 @@ A 2D wavetable morph engine. Picks two wavetables from the baked pool, scans thr
 - **LFO modulation** → continuous fractional semitones. A slow low-depth LFO on `PitchX` (e.g. rate `8`, dep `i`) gives a wandering ±0.05 semi drift, classic chorus-style detune without using the chorus effect.
 
 At unison (default, both pitches = `h`) the two oscillators run on the same phase and the morph is a pure timbral blend. At non-unison they're two independently-pitched oscillators crossfaded by ScanY (octaves, fifths, detune, layered intervals), same model as Vital's Osc A/B transpose.
-
-**Shipped wavetables (20)**, all 256 frames × 2048 samples authored in carvetoy:
-
-| Idx | Name |   | Idx | Name |
-|-----|------|---|-----|------|
-| 0 | BREAD     | | 10 | VISITORS |
-| 1 | BUTTER    | | 11 | OM |
-| 2 | CITIES    | | 12 | PLASMATC |
-| 3 | FALLING   | | 13 | ARC |
-| 4 | PTSD      | | 14 | UNSOLVED |
-| 5 | TESLA     | | 15 | QUEST |
-| 6 | HARMOST   | | 16 | SINEFIL |
-| 7 | AIHM      | | 17 | BATS |
-| 8 | SEMIDIDG  | | 18 | PUWIMO |
-| 9 | BEAMUP    | | 19 | SAWRES |
-
-Adding more is a drop-in: place `NN_NAME.wav` (same dimensions, mono 32-bit float, with the Serum `clm ` chunk) under `wavetables/` and rebuild. Hard cap is 36 wavetables (base-36 picker resolution); practical cap is whatever binary size you're willing to ship (each table adds ~1 MB baked + ~2 MB resident at runtime). Save files record WaveX/WaveY by stable name (`# T<n>_WTX:NAME` / `# T<n>_WTY:NAME` lines, save format v7+) so reordering or inserting wavetables in a future build doesn't silently shift existing projects.
 
 ---
 
@@ -997,10 +980,10 @@ Nine shapes, selected by the `Wav` panel param:
 | 2 | **SAW+** | Rising sawtooth (ramps `-1` → `+1` then snaps back). Classic "envelope-like" sweep: slow attack, instant return. |
 | 3 | **SAW-** | Falling sawtooth (ramps `+1` → `-1` then snaps back). Mirror of SAW+: instant attack, slow decay. Useful as a poor-mans envelope on a target without using the actual envelope. |
 | 4 | **SQR** | Square wave, hard `+1`/`-1` toggle. Trance-gate / step-modulation flavour. Use Skw to PWM. |
-| 5 | **SH-R** | **Sample & Hold, Random**. Each cycle picks a fresh random value (xorshift32). **Non-deterministic**: the sequence is different on every play and different across each LFO instance. Use when you want true unpredictability. |
-| 6 | **SH-S** | **Sample & Hold, Seeded**. Each cycle picks a value via a deterministic hash of `(project_seed, track_id, lfo_id, cycle_count)`. **Reproducible**: replays the same sequence between runs of the same project, but each track / LFO instance gets its own pattern, and changing the project seed reshuffles all of them at once. Use when you want a "wonky but predictable" pattern that survives save/load. |
+| 5 | **SH-R** | **Sample & Hold, Random**. Each cycle picks a fresh pseudo-random value. **Non-deterministic**: the sequence is different on every play and different across each LFO instance. Use when you want true unpredictability. |
+| 6 | **SH-S** | **Sample & Hold, Seeded**. Each cycle picks a deterministic value derived from the project seed, the track, the LFO instance, and the cycle count. **Reproducible**: replays the same sequence between runs of the same project, but each track / LFO instance gets its own pattern, and changing the project seed reshuffles all of them at once. Use when you want a "wonky but predictable" pattern that survives save/load. |
 | 7 | **CONST** | Constant `+1`. Always at full positive output. Combine with VOf and depth scaling to lock a param at any chosen offset. Useful for "always-on detune" or static sub-modulation that interacts with another LFO via `K/M/O` depth modulation. |
-| 8 | **NOISE** | Continuous random output (xorshift32 every update step). Same generator as SH-R but without the hold step, so it changes every ~2 ms instead of once per cycle. Pure noise modulation. |
+| 8 | **NOISE** | Continuous pseudo-random output. Same generator as SH-R but without the hold step, so it changes every ~2 ms instead of once per cycle. Pure noise modulation. |
 
 ### Run modes
 
@@ -1082,7 +1065,7 @@ Every parameter set via `!` in the grid is marked as **sequencer-controlled** (s
 - **Themes** - 14 built-in: Default, Catppuccin, Draculish, Gruvbox, Nord, Solarized, Tokyo Night, Amber, Crimson, GB, GB Inv, Mono, 1991, Goodnight. Selection persists across sessions.
 - **Gamepad** - first-class controller support, designed around grid-editing ergonomics. D-pad navigation, shoulder combos for cut/copy/paste/undo, on-screen keyboard for glyph entry on the Sequencer screen. On instrument pages, hold South + D-pad for the same param-adjust deltas as Shift+Arrow on desktop.
 - **On-screen keyboard** - available on the Sequencer screen for handheld / no-keyboard use. Instrument pages use Shift+Arrow / South+D-pad and (on desktop) direct alphanumeric entry.
-- **Save / load** - `.grampus` file format containing grid, all track params, master params, BPM, seed, tick rate, and shuffle. Plain human-readable text. Backward compatible, files from older versions without a `SHUFFLE` field load cleanly with shuffle defaulted to 50% (straight).
+- **Save / load** - `.grampus` project files store the grid, all track params, master params, BPM, seed, tick rate, and shuffle. Plain human-readable text. Older project files load cleanly across versions.
 - **WAV recording** - `F10` (or R1+Start on the gamepad) toggles recording of the master output to `data_dir/recordings/<project>_<YYYYMMDD_HHMMSS>.wav`. 16-bit PCM stereo with TPDF dithering, headers patched after every chunk so the file is always valid even mid-take.
 - **Toggle comment region** - Algorave style live mute (typical trick for Tidal Cycles/Strudel). Make a selection, press `/` (or L1+R1 on the gamepad), and grampus wraps each row of the rect with `#` (ORCA's comment operator) - silencing everything between. Press again on a wrapped selection to clear the `#`s. Refuses to overwrite real glyphs at the edges.
 - **Envelopes**: the amp envelope and filter envelope each have three stages: Attack, Hold, Decay. Both follow the same rule: the **Hold value** determines the entire shape, independently of note length.
