@@ -31,7 +31,10 @@ Grampus runs on macOS, Linux, Windows, and small-form-factor Linux handhelds. It
   - [String / Karplus (EngType 3)](#string--karplus-engtype-3)
   - [ROMpler (EngType 4)](#rompler-engtype-4)
   - [LoFiTron (EngType 5)](#lofitron-engtype-5)
+  - [WaveSurf (EngType 6)](#wavesurf-engtype-6)
 - [Shared voice chain](#shared-voice-chain)
+- [Drive models](#drive-models)
+- [LFO system](#lfo-system)
 - [Master effects bus](#master-effects-bus)
 - [Parameter system](#parameter-system)
 - [Features](#features)
@@ -477,7 +480,7 @@ Used by both `$` (indices 10-35) and `=` (indices a-z / A-Z):
 | 34 | `y` | Minor11 | 0 3 7 10 17 |
 | 35 | `z` | Minor7♭5 | 0 3 6 10 |
 
-For `=`, indices `0`-`9` are **octave-thickened** voicings — triads fattened with octaves above/below the root, then progressively reduced down to pure octave stacks. The pattern: Up / Down / Both → fifth → power → octave pair → octave triple. Negative intervals shift below the root; if the root is too low, the note octaves up to stay in MIDI range (clamping is symmetric for high-octave overflow).
+For `=`, indices `0`-`9` are **octave-thickened** voicings, triads fattened with octaves above/below the root, then progressively reduced down to pure octave stacks. The pattern: Up / Down / Both → fifth → power → octave pair → octave triple. Negative intervals shift below the root; if the root is too low, the note octaves up to stay in MIDI range (clamping is symmetric for high-octave overflow).
 
 | Index | Glyph | Voicing | Intervals |
 |-------|-------|---------|-----------|
@@ -500,7 +503,7 @@ These operators send notes and parameter changes from the grid to the engines. C
 
 ##### `;` - Note (poly)
 
-Sends `NoteOn` to a synth track. Polyphonic - allocates a free voice in the track's voice pool. (Note: Grampus uses `;` for poly and `:` for mono — the opposite of ORCA, where `:` is the only note operator and `;` is the arpeggiator.)
+Sends `NoteOn` to a synth track. Polyphonic - allocates a free voice in the track's voice pool. (Note: Grampus uses `;` for poly and `:` for mono, the opposite of ORCA, where `:` is the only note operator and `;` is the arpeggiator.)
 
 | Operator | Channel | Octave | Note | Velocity | Length |
 |:--------:|:-------:|:------:|:----:|:--------:|:------:|
@@ -717,7 +720,7 @@ Character: plucked, struck, bell-like. Very responsive to velocity (boosts brigh
 
 Sample-playback engine. Drum kits and pitched instruments share the same 6-parameter interface; the shipped kits cover both. Pitch zones are auto-constructed from the samples in each kit, so any note you play picks the closest sample and pitches it from there. Linear interpolation between adjacent samples keeps pitch shifts clean across the playable range; the `8bit` toggle is the place to add lo-fi character on demand.
 
-> **Drum kits and per-octave sample switching.** For the drum-focused kits (`909`, `808`, `REALDRUM`, `AMEN`), each kit slot occupies a full octave. `C` plays the original (unpitched) sample; every other note up to (but not including) the next `C` is the same sample pitched. So `C..B` in octave 3 is one sample (pitched up across the octave), and `C` in octave 4 picks the next slot's sample. This makes it easy to lay drums out chromatically — pick the kick at one `C`, snare at the next `C`, hats at the next, etc.
+> **Drum kits and per-octave sample switching.** For the drum-focused kits (`909`, `808`, `REALDRUM`, `AMEN`), each kit slot occupies a full octave. `C` plays the original (unpitched) sample; every other note up to (but not including) the next `C` is the same sample pitched. So `C..B` in octave 3 is one sample (pitched up across the octave), and `C` in octave 4 picks the next slot's sample. This makes it easy to lay drums out chromatically, pick the kick at one `C`, snare at the next `C`, hats at the next, etc.
 
 **Shipped kits (17)**, indexed by ROM 0..16:
 
@@ -748,13 +751,13 @@ Sample-playback engine. Drum kits and pitched instruments share the same 6-param
 | 3 | Tune | Fine tune ±50 cents. |
 | 4 | Reverse | 0 = forward, 1 = reversed playback. |
 | 5 | VelCut | Velocity → filter cutoff modulator. Bipolar. `h` = no effect. Stacks with FltCut, FEnvAm, and any LFOs that target FltCut. |
-| 6 | 8bit | 0 = clean, 1 = quantise output to 8-bit (256 levels). Live bitcrush — applied AFTER pitch shifting so it crunches the audible signal, not the source data. |
+| 6 | 8bit | 0 = clean, 1 = quantise output to 8-bit (256 levels). Live bitcrush, applied AFTER pitch shifting so it crunches the audible signal, not the source data. |
 
 Note-off behaviour depends on the kit:
 - **Drum / one-shot kits**: note-off is ignored, the sample plays through. If you want the tail cut, use the Amp envelope (`AmpHld` / `AmpDcy`).
 - **Pitched / looped kits**: note-off triggers the standard Amp envelope release.
 
-**Live pitch / tune modulation**: `Pitch` (slot 2) and `Tune` (slot 3) recompute the playback rate every time they change during a sustained note, so they respond to LFO mod, `!` operator writes, and `!`-with-interpolation lerps in real time. This lets you build pitch envelopes (one-shot LFO on Tune or Pitch) and smooth pitch glides (`!` on Pitch with interpolation > 0). Static patches (no modulation) behave identically to before — the per-note rate is still latched at note-on; only the live-update path is new.
+**Live pitch / tune modulation**: `Pitch` (slot 2) and `Tune` (slot 3) recompute the playback rate every time they change during a sustained note, so they respond to LFO mod, `!` operator writes, and `!`-with-interpolation lerps in real time. This lets you build pitch envelopes (one-shot LFO on Tune or Pitch) and smooth pitch glides (`!` on Pitch with interpolation > 0). Static patches (no modulation) behave identically to before, the per-note rate is still latched at note-on; only the live-update path is new.
 
 Character: classic sampler. Drum kits hit hard; pitched instruments stretch through pitch zones with that "tape-slowed" character at extremes.
 
@@ -762,7 +765,7 @@ Character: classic sampler. Drum kits hit hard; pitched instruments stretch thro
 
 ### LoFiTron (EngType 5)
 
-A 1:1 clone of ROMpler, reading from a separate **TAPE** pool instead of the ROM pool. Same parameter interface, same engine code, same pitch / tune / reverse / VelCut / 8bit behaviour — slot 1 is just labelled `TAPE` (not `ROM`) and the discrete selector picks from a different list of baked sample sets.
+A 1:1 clone of ROMpler, reading from a separate **TAPE** pool instead of the ROM pool. Same parameter interface, same engine code, same pitch / tune / reverse / VelCut / 8bit behaviour, slot 1 is just labelled `TAPE` (not `ROM`) and the discrete selector picks from a different list of baked sample sets.
 
 The intent is to keep two independent sample banks that you can mix and match per track without fighting for ROM slots: ROMpler tends to hold drums + clean melodic content, LoFiTron tends to hold lo-fi sustained / atmospheric material baked at lower rates (24 kHz default) for character. Nothing prevents either pool from being whatever you want it to be.
 
@@ -778,7 +781,51 @@ The intent is to keep two independent sample banks that you can mix and match pe
 | 5 | BRASS | Soft brass layer, looped |
 | 6 | FLUTE | Flute, looped |
 
-The TAPE selector and ROM selector are independent — adding a TAPE never bumps a ROM index, and vice versa. Save files record the selection by stable name, so reordering either pool in a future build doesn't silently remap existing projects.
+The TAPE selector and ROM selector are independent, adding a TAPE never bumps a ROM index, and vice versa. Save files record the selection by stable name, so reordering either pool in a future build doesn't silently remap existing projects.
+
+---
+
+### WaveSurf (EngType 6)
+
+A 2D wavetable morph engine. Picks two wavetables from the baked pool, scans through frames in each, and crossfades between them to produce an evolving terrain. Spiritual descendant of Korg Wavestation / Sequential Prophet VS vector synthesis, where each "corner" is a fully scannable wavetable rather than a static waveform.
+
+| ID | Slot | Notes |
+|----|------|-------|
+| 1 | WaveX | Discrete picker, selects a wavetable from `ALL_WAVETABLES` |
+| 2 | WaveY | Discrete picker, selects a wavetable from `ALL_WAVETABLES` |
+| 3 | ScanX | Frame position inside WaveX (`0` = first frame, `z` = last frame) |
+| 4 | ScanY | Frame position inside WaveY, doubles as the X↔Y morph weight |
+| 5 | PitchX | Per-axis pitch offset for WaveX (bipolar ±17 semitones, `h` = unison) |
+| 6 | PitchY | Per-axis pitch offset for WaveY (bipolar ±17 semitones, `h` = unison) |
+
+**Asymmetric bilinear morph**: at `ScanY = 0` you hear pure `WaveX` at frame `ScanX`; at `ScanY = z` you hear pure `WaveY` at its last frame. Sweeping `ScanY` simultaneously scans through `WaveY`'s frames AND morphs from X to Y. ScanX is independent, it only selects which frame of WaveX is in the mix.
+
+**One-pole smoothing on all scan/wave params at audio rate** so base-36 modulation (e.g. `!` writes from the sequencer every tick) glides between values rather than zippering. Hardcoded ~50 ms time constant; if it ever needs user control, it'll get a dedicated slot.
+
+**Wavetable swaps** (changing WaveX or WaveY) crossfade over ~10 ms instead of cutting. Mid-note picker changes are click-free.
+
+**Per-axis pitch with dual-resolution semantics**:
+- **Manual / `!` writes** (integer base-36 input) → exact integer semitones. `PitchX = 18` is `+1` semi, `PitchX = 5` is `-12` semi (an octave down), etc. Use for octaves, fifths, sub-foundations.
+- **LFO modulation** → continuous fractional semitones. A slow low-depth LFO on `PitchX` (e.g. rate `8`, dep `i`) gives a wandering ±0.05 semi drift, classic chorus-style detune without using the chorus effect.
+
+At unison (default, both pitches = `h`) the two oscillators run on the same phase and the morph is a pure timbral blend. At non-unison they're two independently-pitched oscillators crossfaded by ScanY (octaves, fifths, detune, layered intervals), same model as Vital's Osc A/B transpose.
+
+**Shipped wavetables (20)**, all 256 frames × 2048 samples authored in carvetoy:
+
+| Idx | Name |   | Idx | Name |
+|-----|------|---|-----|------|
+| 0 | BREAD     | | 10 | VISITORS |
+| 1 | BUTTER    | | 11 | OM |
+| 2 | CITIES    | | 12 | PLASMATC |
+| 3 | FALLING   | | 13 | ARC |
+| 4 | PTSD      | | 14 | UNSOLVED |
+| 5 | TESLA     | | 15 | QUEST |
+| 6 | HARMOST   | | 16 | SINEFIL |
+| 7 | AIHM      | | 17 | BATS |
+| 8 | SEMIDIDG  | | 18 | PUWIMO |
+| 9 | BEAMUP    | | 19 | SAWRES |
+
+Adding more is a drop-in: place `NN_NAME.wav` (same dimensions, mono 32-bit float, with the Serum `clm ` chunk) under `wavetables/` and rebuild. Hard cap is 36 wavetables (base-36 picker resolution); practical cap is whatever binary size you're willing to ship (each table adds ~1 MB baked + ~2 MB resident at runtime). Save files record WaveX/WaveY by stable name (`# T<n>_WTX:NAME` / `# T<n>_WTY:NAME` lines, save format v7+) so reordering or inserting wavetables in a future build doesn't silently shift existing projects.
 
 ---
 
@@ -789,7 +836,7 @@ Every voice, regardless of type, passes through the same chain:
 - **AHD envelope** (params 10-12: AmpAtk / AmpHld / AmpDcy)
   - Custom time curve: hand-picked 0-12 (10 ms → 750 ms), exponential 13-35 (1 s → 24 s).
   - **`AmpHld = 0` → INF (gate mode)**: level stays at peak until note-off arrives, then Decay runs. Default. Use for sustained notes, pads, leads.
-  - **`AmpHld = 1..z` → AHD (auto-decay)**: Atk → Hld (dwell) → Dcy fires automatically regardless of note length. Use for drums, plucks, blips — the envelope shape defines the sound duration.
+  - **`AmpHld = 1..z` → AHD (auto-decay)**: Atk → Hld (dwell) → Dcy fires automatically regardless of note length. Use for drums, plucks, blips, the envelope shape defines the sound duration.
 - **True-stereo MultiFilter** (params 13-15: FltTyp / FltCut / FltRes) - independent L/R filter instances:
   - 0 Off (passthrough)
   - 1 **Moog LP** (4-pole ladder, 24 dB/oct)
@@ -802,11 +849,168 @@ Every voice, regardless of type, passes through the same chain:
 - **Filter envelope** (params 16-19: FEnvAm / FEnvAt / FEnvHl / FEnvDc) - bipolar amount, modulates filter cutoff in normalized space. Only triggers when amount ≠ 0.
 - **Per-track tilt EQ** (param 28: `S>Tone`) - bipolar one-pole tilt inserted right after the per-track compressor. `h` (centre) is bypass; values below `h` roll off highs (LP), values above roll off lows (HP). Same shape as the master Delay/Reverb tone controls. Useful for gentle per-track mix shaping (e.g. dipping the subs of a snare or trimming hiss off cymbals) without a separate FX module.
 - **Per-track stereo chorus** (param 27: `R>Chorus`) - bipolar single-knob chorus inserted post-drive. `h` (centre) is bypass. **Negative side** ramps a "warm/Juno-style" chorus with **2.5/3.75/5/6.25 ms** base delays - tight, classic. **Positive side** ramps a "spacey" chorus with **10/15/20/25 ms** base delays - wider, more dispersed. Magnitude scales depth (up to ~4.8 ms LFO swing), rate (0.3-1.0 Hz), feedback (0-50%), and wet mix together, so one slider gives you a cohesive musical sound at any setting. Feedback ramps slightly faster than depth/rate so the resonant character builds in earlier - matches the mental model that pushing the slider further means more obvious chorus, not just louder dry-vs-wet. Internally: 4 LFO-modulated taps 90° apart, ~110 Hz HPF on the wet path keeps bass mono and out of the feedback loop. Costs ~2% of one CPU core per active track at 48 kHz; bypassed tracks are essentially free.
-- **Drive** (params 29 / 30: DrvMdl / Drive amount) - 11 modes:
-  - 0 Clip, 1 Post, 2 PostAd (adaptive RMS-tracking soft clip), 3 Sin, 4 Fold, 5 Wrap, 6-8 Alg1/2/3 (sine-fold variants), 9 Cream (Marshall-style 3-stage tube), 10 Doom (Rat-style fuzz). Cream and Doom include cabinet simulation.
+- **Drive** (params 29 / 30: DrvMdl / Drive amount) - 11 modes, see the [Drive models](#drive-models) section below for the full breakdown.
 - **Sends** (params 31-33): DlySnd, RDlSnd, RevSnd - per-track wet amounts to the master buses.
 - **Pan** (param 34) - bipolar, `cos`/`sin` equal-power.
 - **Volume** (param 35) - dry output level.
+
+---
+
+## Drive models
+
+Eleven distortion algorithms selected by `DrvMdl` (param 29) and intensity-controlled by `Drive` (param 30). Two important things to know upfront:
+
+**Pre-filter vs post-filter placement.** Where the drive lives in the signal chain changes the result substantially:
+
+- **Pre-filter (per-voice, before the filter)**: `Clip`, `Sin`, `Fold`, `Wrap`. The waveshaper runs on each voice's raw oscillator output. The filter then shapes the harmonics the distortion produced. Classic subtractive synth architecture: gnarly oscillator, mellow filter sweep can take the edge off, resonance interacts with the new harmonics.
+- **Post-filter (per-track, after the filter)**: `Post`, `PostAd`, `Alg1/2/3`, `Cream`, `Doom`. The drive runs on the full mixed track signal after the filter. The filter's removed harmonics aren't there to be distorted; the distortion adds new harmonics on top of whatever survived. Better for amp-style colouring of an already-shaped sound.
+
+**Drive amount has two phases.** From `0` to `8` the wet/dry mix ramps from clean to 100% wet. From `8` to `z` the mix stays at 100% wet but the input pre-gain keeps climbing (~1× to ~12× for most shapes, ~19× for the Post variants), so the timbre keeps deepening without further level change. Means `8` is the "fully wet but mild" point; push past it for proper saturation.
+
+---
+
+### 0: Clip (pre-filter)
+
+Hard digital clip at ±1.0. Bright, edgy, harmonically dense, classic "fuzz pedal into LP filter" texture when paired with the Moog. Below `8` you hear it as a dirt overlay; past `8` the squarewave-like character takes over.
+
+- **Best for**: aggressive bass, hard leads, drum bus glue, anything you want shaped by the filter afterward
+- **Math**: `clamp(x · g_in, -1, 1)` (pure hard-knee clip)
+
+### 1: Post (post-filter)
+
+Same hard clip as `Clip`, but placed after the filter. The filter's already softened the high end so what gets clipped is the surviving fundamental + low harmonics. Sounds more like a transparent limiter at low drive, more like a square-wave shaper at high drive.
+
+- **Best for**: post-filter level taming, deliberate compression-like behaviour, "studio limiter pushed too hard" character
+- **Math**: same as Clip, but with a hotter pre-gain (1 → ~19× across the drive range, vs ~12× for Clip)
+
+### 2: PostAd (post-filter)
+
+Adaptive `tanh` soft-clip post-filter. Smoother than `Post` because tanh has a soft knee rather than a hard corner, and the higher pre-gain (~19×) means even moderate drive settings push well into the saturation region.
+
+- **Best for**: warm bus saturation, cleaner-sounding heavy drive, rounding off a too-bright synth
+- **Math**: `tanh(x · g_in)` (smooth saturator, infinite-soft knee)
+
+### 3: Sin (pre-filter)
+
+Sine waveshaper: `sin(x · π/2)`. Below ±1 it's nearly identity (very mild colour); past ±1 it folds back into itself. Adds odd harmonics smoothly, then odd+even as it folds. Often described as "bell-like" at high drive.
+
+- **Best for**: enriching thin oscillators with smooth harmonics, lead synths that need bite without harshness, evolving textures as drive rises
+- **Math**: `sin(x · π/2 · g_in)`. Wraps over the sine peak when |x · g_in| > 1.
+
+### 4: Fold (pre-filter)
+
+Triangle wavefolder, Buchla-style: signal reflects off ±1 boundaries instead of clipping or wrapping. Extremely characterful: creates upper harmonics that move *with* the input level rather than at fixed multiples of the fundamental.
+
+- **Best for**: West Coast / Buchla-style FM-ish timbres, animated textures, anything where you want the harmonic content to breathe with dynamics
+- **Math**: triangular reflection that bounces off ±1; output stays bounded but the waveform shape morphs continuously with drive
+
+### 5: Wrap (pre-filter)
+
+Sawtooth wrap: when the signal crosses ±1, it jumps to the opposite extreme. Brutal discontinuities that produce massive aliasing-like high content (intentionally; these are real harmonics, not aliasing). Sounds digital and chaotic.
+
+- **Best for**: harsh industrial textures, aggressive sound design, glitch-style noise
+- **Math**: `((x · g_in + 1) mod 2) - 1` (sharp wraparound at boundaries)
+
+### 6: Alg1 (post-filter)
+
+Single sine fold: `sin(x · π)`. Folds the signal once into a sinusoidal envelope. Adds odd harmonics with a notably smooth, almost vocal character at moderate drive.
+
+- **Best for**: organ-like richness, Rhodes-ish overtones, smooth warming
+- **Math**: `sin(x · π · g_in)` (single full-cycle sine fold)
+
+### 7: Alg2 (post-filter)
+
+Double sine fold: `sin(x · 2π)`. Twice the fold rate, so you get twice the harmonic density before clipping kicks in. Brighter and busier than `Alg1`, with a metallic edge starting to appear.
+
+- **Best for**: metallic leads, bell-like accents, FM-style timbres without an FM operator
+- **Math**: `sin(x · 2π · g_in)` (double-frequency sine fold)
+
+### 8: Alg3 (post-filter)
+
+Triple sine fold: `sin(x · 3π)`. The most extreme of the Alg variants. Inharmonic, gritty, glassy. Often unmusical at full drive but a powerful shaper at low-to-mid amounts.
+
+- **Best for**: aggressive sound design, ring-mod-ish flavours, granular-sounding overlays
+- **Math**: `sin(x · 3π · g_in)` (triple-frequency sine fold)
+
+### 9: Cream (post-filter, stateful)
+
+Marshall-style tube saturation. Three cascaded `tanh` stages with DC bias (for asymmetric clipping, hence even harmonics), inter-stage coupling-cap HPFs, and a 6-band cabinet simulation (HPF + 4 EQ bells + LPF that opens with drive). 50Hz drive smoothing prevents zipper noise on automation. A sub-50Hz clean-bass bypass is mixed back in so the bottom doesn't disappear under saturation. Genuine guitar amp character.
+
+- **Best for**: rock-style leads, warm crunchy bass, anything that wants "tube warmth" rather than digital edge
+- **Math**: 3 × `tanh(x · stage_gain + bias) → DC blocker → coupling HPF → ...` then the cab sim. Stateful: has memory across samples, so transients respond differently than steady tones.
+
+### 10: Doom (post-filter, stateful)
+
+Rat-style fuzz pedal. Three cascaded asymmetric hard/soft fuzz stages (blend of hard clipping and tanh, with adjustable asymmetry per stage), looser coupling caps than Cream (60-80Hz vs 120-180Hz so more bass survives), and a darker, more scooped cabinet simulation (mid scoop at 700Hz, brighter shelf at 5500Hz). Significantly more aggressive gain staging than Cream, saturates much harder for the same drive setting. Like Cream, includes the sub-50Hz clean bypass.
+
+- **Best for**: doom / sludge bass, fuzz leads, brutal saturated drums, anything that wants to sound completely destroyed but musically
+- **Math**: 3 × asymmetric fuzz stage with blended hard-clip + tanh → coupling caps → scooped cab sim. Stateful.
+
+---
+
+## LFO system
+
+Every track carries **three monophonic LFOs** (`L1`, `L2`, `L3`) that can modulate any combination of the track's 36 base-36 params: oscillator slots, envelopes, filter, drive, sends, pan, volume, even other LFOs' depth or rate. Edits live on the LFO panel, but a few of their controls are surfaced as regular grid params so the sequencer (`!` operator, other LFOs) can drive them directly.
+
+LFOs run at **480 Hz** internally, decoupled from the sequencer tick rate for smooth modulation regardless of BPM.
+
+### Track-level slot layout
+
+Each LFO claims a pair of grid params:
+
+| Param | LFO | Purpose |
+|-------|-----|---------|
+| `K` (20) | L1 | Dep (target depth) |
+| `L` (21) | L1 | Rate |
+| `M` (22) | L2 | Dep |
+| `N` (23) | L2 | Rate |
+| `O` (24) | L3 | Dep |
+| `P` (25) | L3 | Rate |
+
+**Dep slots (`K` / `M` / `O`)** are bipolar centred on `h`. They behave specially: the visible base value stays pinned at `h`, but writes to it (manual or `!`) update **all three of the LFO's stored per-target depths uniformly**. So if your LFO is routed to filter cutoff, drive amount, and sends, `!K17` is unison neutral, `!Kz` boosts every target's depth uniformly, and `!K0` inverts every target's depth. Lets a single grid write swing the entire LFO output without editing each target depth individually. Other LFOs can also modulate `K/M/O` for "depth modulation" (LFO modulating LFO).
+
+**Rate slots (`L` / `N` / `P`)** are unipolar `0..z`. The base-36 value indexes the same rate lookup table the Bouncer (`&`) uses, so `0` is 4096 ticks per cycle (very slow), `h` is 32 ticks (~4 s/cycle at BPM 120 Normal), and `z` is 1 tick per cycle (8 Hz at BPM 120 Normal). Cycle length is in ticks, so it always tempo-syncs.
+
+### Per-LFO parameters
+
+These live on the LFO panel (not on the grid), one set per LFO:
+
+| Param | Range | What it does |
+|-------|-------|--------------|
+| **Prm 0/1/2** | `.` or `0..z` | Three target params per LFO. `.` = off; otherwise a base-36 param id (0..35). The same LFO can hit up to 3 different track params at once. |
+| **Wav** | `0..8` | Waveform shape (see table below). |
+| **Smo** | `0..z` | Smoothing. `0` = none (pure waveform). For continuous shapes (Sin / Tri / Saw / Sqr) it's a one-pole lowpass on the output: 10 ms time constant at `1`, ramping to ~1 s at `z`. For S&H shapes (SH-R / SH-S) it's a two-phase step interpolation: low values give the classic instant-step character, high values smoothly ease between held samples (turns S&H into something more like a glide-filtered random walk). |
+| **Skw** | `0..y`, bipolar `h` | Phase skew. `h` = symmetric. Below `h` compresses the first half of the cycle (sharper attack, longer release on Tri/Saw); above `h` does the opposite. On SQR it acts like PWM. |
+| **HOf** | `0..y`, bipolar `h` | Horizontal phase offset. `h` = no offset; magnitude shifts the cycle start by ±50%. Useful for de-syncing two LFOs running at the same rate. |
+| **VOf** | `0..y`, bipolar `h` | Vertical (DC) offset added to the waveform before polarity. `h` = no offset; magnitude shifts the bipolar output up or down (clamped to ±1). Lets you bias a bipolar LFO toward positive-only or negative-only excursions without switching to UNI polarity. |
+| **Pol** | `BI` / `UNI` | Bipolar (default, output `[-1, +1]`) or unipolar (output `[0, +1]`). UNI is useful when you want a target to only swing one way from its base value. |
+| **Run** | `FREE` / `TRIG` / `ONCE` | Phase reset behaviour, see below. |
+
+### Waveforms
+
+Nine shapes, selected by the `Wav` panel param:
+
+| Idx | Name | Character |
+|-----|------|-----------|
+| 0 | **SIN** | Smooth sine. Default modulator for everything. |
+| 1 | **TRI** | Symmetric triangle. Sharper transitions than sine, no high harmonics like a sawtooth. Good for filter sweeps that need to feel deliberate. |
+| 2 | **SAW+** | Rising sawtooth (ramps `-1` → `+1` then snaps back). Classic "envelope-like" sweep: slow attack, instant return. |
+| 3 | **SAW-** | Falling sawtooth (ramps `+1` → `-1` then snaps back). Mirror of SAW+: instant attack, slow decay. Useful as a poor-mans envelope on a target without using the actual envelope. |
+| 4 | **SQR** | Square wave, hard `+1`/`-1` toggle. Trance-gate / step-modulation flavour. Use Skw to PWM. |
+| 5 | **SH-R** | **Sample & Hold, Random**. Each cycle picks a fresh random value (xorshift32). **Non-deterministic**: the sequence is different on every play and different across each LFO instance. Use when you want true unpredictability. |
+| 6 | **SH-S** | **Sample & Hold, Seeded**. Each cycle picks a value via a deterministic hash of `(project_seed, track_id, lfo_id, cycle_count)`. **Reproducible**: replays the same sequence between runs of the same project, but each track / LFO instance gets its own pattern, and changing the project seed reshuffles all of them at once. Use when you want a "wonky but predictable" pattern that survives save/load. |
+| 7 | **CONST** | Constant `+1`. Always at full positive output. Combine with VOf and depth scaling to lock a param at any chosen offset. Useful for "always-on detune" or static sub-modulation that interacts with another LFO via `K/M/O` depth modulation. |
+| 8 | **NOISE** | Continuous random output (xorshift32 every update step). Same generator as SH-R but without the hold step, so it changes every ~2 ms instead of once per cycle. Pure noise modulation. |
+
+### Run modes
+
+Controls how the LFO responds to NoteOn events on its track:
+
+- **FREE**: phase ignores notes entirely. The LFO runs as a continuous live stream, useful for ambient drift / tempo-synced patterns that shouldn't restart with every note.
+- **TRIG**: phase resets to `0` on every NoteOn. Good for "pluck-like" envelope substitutes (combine with SAW- and a one-shot-ish rate).
+- **ONCE**: phase resets to `0` on NoteOn, then **freezes at the end of the first cycle**. The LFO runs through one full pass and stops. Effectively a one-shot envelope generator. SH-S's seeded sequence also restarts from cycle 0 on TRIG / ONCE so retriggers replay the same pattern.
+
+`Ctrl+R` (sequencer reset) jumps FREE and TRIG LFOs back to phase 0 and clears their scopes; ONCE LFOs are left untouched so a long one-shot in flight isn't interrupted.
 
 ---
 
@@ -817,7 +1021,9 @@ Every track's dry signal sums into the master bus, and each track also feeds thr
 - **Delay** - stereo ping-pong, tempo-synced with 16 musical divisions from 1/32 up to 4 bars. Feedback, bipolar tone (LP ↔ HP), LFO time modulation, and an optional granular overlay (see below). Master params: DlyTime, DlyFdbk, DlyTone, DlyMod, DlyGrn.
 - **Reverse delay** - true stereo reverse delay with crossfaded boundaries. Same 16 divisions, its own tone and mod. Also has a granular overlay.
 - **Reverb** - 32-voice modulated FDN reverb with **shimmer feedback** (octave-up pitch shifter blended back into the reverb tail). Master params: RvbSize, RvbDcay, RvbDiff, RvbMod, RvbTone, RvbShim. Plus a `Dly→Rvb` send that feeds the delay outputs into the reverb tank for cascaded textures.
-- **Granular texture** (used by both delays as an overlay) - up to 32 simultaneous grains spawning every ~120 ms with random offsets, octave-up shimmer when the param is positive, power-chord shimmer when negative.
+- **Granular texture** (used by both delays as an overlay, controlled by `DlyGrn`) - bipolar centred on `h` (= 17 = bypass, no grains). Magnitude scales density (up to 32 simultaneous grains spawning every ~120 ms with random offsets), grain size (smaller as the knob moves further from centre), and wet mix together. Two distinct shimmer flavours either side of centre:
+  - **Above `h` (`i..z`)**: **octave shimmer**. ~50% of grains pitched +1 octave (2× rate), the rest at base pitch. Bright, lifting, classic shimmer-reverb-style upward halo.
+  - **Below `h` (`0..g`)**: **power-chord shimmer**. Grains randomly pitched at base, +fifth (1.5× rate), or +octave (2× rate). Gives a chord-stack flavour because the fifth + octave + root sound together inside the grain cloud, like a ghosted power chord trailing the dry signal.
 - **Tape Noise + Vinyl Dust** - two always-on stereo loops mixed into the master sum. Each has its own gain (master params `X TapeNois` / `Y VinylDst`); `0` = silent. The loops keep playing even when their gain is `0`, so automating `!X` or `!Y` from the grid never restarts them mid-loop.
 - **FAT compressor** - one-knob bus compressor (Compress param). The single amount control simultaneously drives threshold, ratio, attack, release, and makeup gain along musical curves so `o` (`~70%`) gives instant glue and `z` pumps hard. Default is `o` for ready-to-go cohesion.
 - **Safety limiter** - fixed brick-wall limiter at the very end of the chain. Catches stray peaks before output. No user controls.
@@ -836,7 +1042,7 @@ The sequencer and the synth share one language: **36 base-36 parameter slots per
 
 | ID | Name | Notes |
 |----|------|-------|
-| 0 | EngType | 0 = Drifter, 1 = Warper, 2 = BrokenFM, 3 = String, 4 = ROMpler, 5 = LoFiTron |
+| 0 | EngType | 0 = Drifter, 1 = Warper, 2 = BrokenFM, 3 = String, 4 = ROMpler, 5 = LoFiTron, 6 = WaveSurf |
 | 1-9 | Oscillator-specific | Names change per engine (see above). BrokenFM only uses 1-5; rest are skipped. |
 | 10-12 | AmpAtk / AmpHld / AmpDcy | Amplitude envelope |
 | 13-15 | FltTyp / FltCut / FltRes | Filter |
@@ -876,21 +1082,21 @@ Every parameter set via `!` in the grid is marked as **sequencer-controlled** (s
 - **Themes** - 14 built-in: Default, Catppuccin, Draculish, Gruvbox, Nord, Solarized, Tokyo Night, Amber, Crimson, GB, GB Inv, Mono, 1991, Goodnight. Selection persists across sessions.
 - **Gamepad** - first-class controller support, designed around grid-editing ergonomics. D-pad navigation, shoulder combos for cut/copy/paste/undo, on-screen keyboard for glyph entry on the Sequencer screen. On instrument pages, hold South + D-pad for the same param-adjust deltas as Shift+Arrow on desktop.
 - **On-screen keyboard** - available on the Sequencer screen for handheld / no-keyboard use. Instrument pages use Shift+Arrow / South+D-pad and (on desktop) direct alphanumeric entry.
-- **Save / load** - `.grampus` file format containing grid, all track params, master params, BPM, seed, tick rate, and shuffle. Plain human-readable text. Backward compatible — files from older versions without a `SHUFFLE` field load cleanly with shuffle defaulted to 50% (straight).
+- **Save / load** - `.grampus` file format containing grid, all track params, master params, BPM, seed, tick rate, and shuffle. Plain human-readable text. Backward compatible, files from older versions without a `SHUFFLE` field load cleanly with shuffle defaulted to 50% (straight).
 - **WAV recording** - `F10` (or R1+Start on the gamepad) toggles recording of the master output to `data_dir/recordings/<project>_<YYYYMMDD_HHMMSS>.wav`. 16-bit PCM stereo with TPDF dithering, headers patched after every chunk so the file is always valid even mid-take.
 - **Toggle comment region** - Algorave style live mute (typical trick for Tidal Cycles/Strudel). Make a selection, press `/` (or L1+R1 on the gamepad), and grampus wraps each row of the rect with `#` (ORCA's comment operator) - silencing everything between. Press again on a wrapped selection to clear the `#`s. Refuses to overwrite real glyphs at the edges.
-- **Envelopes** — the amp envelope and filter envelope each have three stages: Attack, Hold, Decay. Both follow the same rule: the **Hold value** determines the entire shape, independently of note length.
+- **Envelopes**: the amp envelope and filter envelope each have three stages: Attack, Hold, Decay. Both follow the same rule: the **Hold value** determines the entire shape, independently of note length.
 
   - **`Hld = 0` → INF (gate mode)**: Attack → **Sustain** (level held at peak) → Decay on note-off. The note's operator length controls when note-off fires and Decay begins. Default for both envelopes. Use for pads, leads, sustained filter sweeps.
   - **`Hld = 1..z` → AHD (auto-decay)**: Attack → **Hold** (dwell for the specified time) → Decay fires automatically, regardless of note length. The envelope completes its full shape even while the voice is still sounding. Use for drums, plucks, or to put a rhythmic filter sweep on a long sustained pad.
 
-  These two modes apply **independently** to the amp and filter envelopes, so you can mix and match freely. Example: `AmpHld = 0` (INF — voice holds for the full note) + `FEnvHld = h` (500 ms auto-AHD filter sweep that opens and closes mid-note).
+  These two modes apply **independently** to the amp and filter envelopes, so you can mix and match freely. Example: `AmpHld = 0` (INF, voice holds for the full note) + `FEnvHld = h` (500 ms auto-AHD filter sweep that opens and closes mid-note).
 
   **Trigger notes (operator length = 0)** always use auto-AHD on both envelopes regardless of the Hld value, since no note-off ever arrives for them.
 
   This applies to both the **amp envelope** (`AmpAtk / AmpHld / AmpDcy`, params A/B/C) and the **filter envelope** (`FEnvAt / FEnvHl / FEnvDc`, params H/I/J).
 
-  - **Time per value** — every Atk/Hld/Dcy slot reads its base-36 glyph through this table. For **Hld only, value `0` is the special INF marker** (not a time); for Atk and Dcy, `0` means instant (~1 ms internally):
+  - **Time per value**: every Atk/Hld/Dcy slot reads its base-36 glyph through this table. For **Hld only, value `0` is the special INF marker** (not a time); for Atk and Dcy, `0` means instant (~1 ms internally):
 
     | Glyph | Atk / Dcy time | Hld | | Glyph | Atk / Dcy time | Hld |
     |:-----:|----------------|-----|---|:-----:|----------------|-----|
