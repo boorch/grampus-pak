@@ -32,6 +32,7 @@ Grampus runs on macOS, Linux, Windows, and small-form-factor Linux handhelds. It
   - [ROMpler (EngType 4)](#rompler-engtype-4)
   - [LoFiTron (EngType 5)](#lofitron-engtype-5)
   - [WaveSurf (EngType 6)](#wavesurf-engtype-6)
+  - [SynDrums (EngType 7)](#syndrums-engtype-7)
 - [Shared voice chain](#shared-voice-chain)
 - [Drive models](#drive-models)
 - [LFO system](#lfo-system)
@@ -812,6 +813,48 @@ At unison (default, both pitches = `h`) the two oscillators run on the same phas
 
 ---
 
+### SynDrums (EngType 7)
+
+A drum-synthesis voice with five built-in models (kick, snare, clap, toms, cymbals), each with their own algorithm and parameter mapping. On top of the synthesised body sits a transient-sample player (one of 29 baked transient hits in the pool) that crossfades with the synth via the BAL slider. Per-hit micro-detune (±0.5%) and velocity-scaled decay are applied automatically so consecutive hits don't sound mechanically identical.
+
+| ID | Slot | Notes |
+|----|------|-------|
+| 1 | MODEL | Picks the drum model: BD / SD / CLAP / TOMS / CYMBALS |
+| 2 | TRANSNT | Picks one of the baked transient samples (kick clicks, snare hits, hi-hat sticks, etc.) |
+| 3 | BAL | Bipolar synth↔transient mix (`a` = body-favoured, `h` = equal mix, `z` = pure transient) |
+| 4 | SHAPE | Per-model character (see table below) |
+| 5 | DECAY | Per-model decay / morph (also gently scaled by note velocity for realism) |
+| 6 | TONE | Per-model timbre / brightness |
+| 7 | VIBE | Per-model: OUT/AUX algorithm crossfade for kick/snare/cymbals; burst spacing for clap |
+| 8 | COLOR | Per-model post-FX (saturation / rattle / shimmer reverb, see table below) |
+
+**SHAPE / TONE / DECAY / VIBE per model:**
+
+| Model | SHAPE | TONE | DECAY | VIBE |
+|-------|-------|------|-------|------|
+| **BD** | Attack sharpness + amount of overdrive | Body brightness | Body decay time | Crossfade between two parallel kick algorithms (analog 808-style at one extreme, FM kick at the other) |
+| **SD** | Balance between the harmonic body and the noisy snare-wires component | Balance between the drum's shell modes | Body decay time | Crossfade between two parallel snare algorithms (resonant shell+bandpass-noise at one extreme, FM-sine pair + HP-noise at the other) |
+| **CLAP** | Centre frequency of the resonant peak in the noise (~800 Hz at `0`, ~13 kHz at `z`); also pitch-tracks the played note (one octave per octave of input) | Final low-pass cutoff (~3 kHz at `0`, ~12 kHz at `z`) | Length of the long tail after the burst sequence (~50 ms at `0`, ~320 ms at `z`) | Spacing between the four noise bursts that make up the clap (~5 ms tight at `0`, ~26 ms wide at `z`) |
+| **TOMS** | Same as BD (attack sharpness + drive); pitched up an octave-ish from kick territory | Same as BD (body brightness) | Same as BD (body decay) | Same as BD (analog ↔ FM crossfade) |
+| **CYMBALS** | Balance of the metallic and filtered-noise components | High-pass filter cutoff (lower = darker, higher = thinner) | Decay length | Crossfade between two parallel hi-hat algorithms (six squares + dirty VCA at one extreme, ring-modulated square pairs + clean VCA at the other) |
+
+**COLOR per model (distinct post-FX, all at zero by default):**
+
+| Model | COLOR effect |
+|-------|-----------|
+| **BD / SD / CLAP** | Soft-clip saturation. Adds harmonic warmth without extra loudness. Overdrives the body more aggressively as you turn it up. |
+| **TOMS** | Subtle short HP-filtered noise burst that decays alongside the body, adding a "rattle" character. The decay length grows quickly only at the top of the slot, so low/mid values give a sharp snap and only the highest values open into a longer rattle. |
+| **CYMBALS** | Built-in shimmer reverb (per voice). COLOR controls both the reverb feedback (decay length) and the wet mix, so a single knob takes you from dry hi-hat to long lush cymbal sustain. Each voice has its own reverb so different cymbal hits don't smear into one tank. |
+
+**Notes**
+
+- The TRANSNT picker stores its choice by stable name, so reordering or renaming the transient pool in future updates won't break older patches.
+- The MODEL choice is also stored by stable name (BD / SD / CLAP / TOMS / CYMBALS), so you can safely save a patch on one model and the slot will resolve correctly even if model order changes.
+- Loud hits decay slightly longer than soft hits (linear ±30% velocity scaling on DECAY); small acoustic-realism cue across all models.
+- Each new note adds a tiny ±0.5% pitch jitter to both the synth body (where applicable) and the transient sample, so machine-gun repeats don't sound mechanically identical.
+
+---
+
 ## Shared voice chain
 
 Every voice, regardless of type, passes through the same chain:
@@ -1061,7 +1104,24 @@ Every parameter set via `!` in the grid is marked as **sequencer-controlled** (s
 - **Per-engine presets** - switching `EngType` saves all params for the old engine and restores the last-used params for the new one, so you can A/B engines without losing your tweaks.
 - **Per-track spectrum analyser** - eight side-by-side frequency bands per track rendered above the grid on the Sequencer screen.
 - **Undo/redo** - grid edits and parameter changes use separate undo stacks (100-deep each).
-- **Copy/paste** - Ctrl+C/X/V works on the grid (region selection). On a track page it operates on **all 36 params of the current track** (separate clipboard from the grid). Cut acts as copy for convenience. The Master page has no copy/paste.
+- **Copy/paste** - Ctrl+C/X/V works on the grid (region selection). Track pages have a separate clipboard for params with **panel-scoped** behaviour:
+  - **Ctrl+C** (or `L1/R1 + South` on gamepad) → copy **all** params of the current track (engine type, OSC, AMP/FILTER, FX/MIX, all three LFOs).
+  - **Ctrl+X** (or `L1/R1 + West` on gamepad) → copy **only the panel** containing the focused param. Each track page has six panels (OSC, AMP/FILTER, FX/MIX, LFO KL, LFO MN, LFO OP); whichever one you're focused inside is what gets copied. Useful for sharing just an LFO routing or just an FX/MIX setup between tracks without overwriting anything else.
+  - **Ctrl+V** (or `L1/R1 + East` on gamepad) → paste. Whole-track clipboards overwrite all 36 slots (and switch the destination's engine if needed). Panel-scoped clipboards only touch the matching panel on the destination, leaving every other panel untouched.
+
+  **Where a panel paste lands** depends on the clipboard's panel and your current focus on the destination track. Non-LFO panels only exist once per track so they always go to the matching panel. LFO panels can be redirected by where you're focused, so you can copy an LFO setup and drop it into a different LFO slot on any track:
+
+  | Clipboard scope | Focused panel on destination | Pastes into |
+  |---|---|---|
+  | OSC | anywhere | OSC |
+  | AMP/FILTER | anywhere | AMP/FILTER |
+  | FX/MIX | anywhere | FX/MIX |
+  | LFO KL | LFO KL | LFO KL (same) |
+  | LFO KL | LFO MN | **LFO MN** (redirected) |
+  | LFO KL | LFO OP | **LFO OP** (redirected) |
+  | LFO KL | OSC / AMP / FX | LFO KL (fallback to source) |
+
+  Toast confirmation shows the destination panel (e.g. "Copied LFO KL from T2", "Pasted LFO OP to T5"). The Master page has no copy/paste.
 - **Themes** - 14 built-in: Default, Catppuccin, Draculish, Gruvbox, Nord, Solarized, Tokyo Night, Amber, Crimson, GB, GB Inv, Mono, 1991, Goodnight. Selection persists across sessions.
 - **Gamepad** - first-class controller support, designed around grid-editing ergonomics. D-pad navigation, shoulder combos for cut/copy/paste/undo, on-screen keyboard for glyph entry on the Sequencer screen. On instrument pages, hold South + D-pad for the same param-adjust deltas as Shift+Arrow on desktop.
 - **On-screen keyboard** - available on the Sequencer screen for handheld / no-keyboard use. Instrument pages use Shift+Arrow / South+D-pad and (on desktop) direct alphanumeric entry.
