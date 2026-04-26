@@ -413,7 +413,7 @@ Unified scale + chord lookup. Runs every tick. Outputs the **note** directly sou
 - **O** - octave (0-9). If empty, no octave is output.
 - **R** - root note (`C`, `c`=C♯/D♭, `D`, `d`=D♯/E♭, `E`, `F`, `f`=F♯/G♭, `G`, `g`=G♯/A♭, `A`, `a`=A♯/B♭, `B`).
 - **S** - scale or chord:
-  - `0`-`9` - one of the 10 scales: Major, Minor, Dorian, Lydian, Mixolydian, Pentatonic, Hirajoshi, Iwato, Tetratonic, Fifths.
+  - `0`-`9` - one of the 10 scales: Major, Minor, Lydian, Dorian, Mixolydian, Hirajoshi, Pentatonic, Tetratonic, Fifths, Iwato.
   - `a`-`z` - one of the 26 chord types (see chord table below).
   - Uppercase `A`-`Z` for chords = **first inversion** (root is bumped up an octave).
 - **D** - scale/chord degree (0-indexed). Degrees beyond the last note wrap and add an octave.
@@ -448,53 +448,104 @@ Tempo-synced LFO. Runs every tick. Resets its phase on a neighbouring bang or wh
 - **R** - rate, 0-35. Indexes a **16-entry musical cycle table**; higher values = faster cycles (from thousands of ticks per cycle down to 1 tick per cycle).
 - **S** - shape 0-7: `0` Tri · `1` InvTri · `2` Sine · `3` InvSine · `4` Square · `5` InvSquare · `6` Saw · `7` InvSaw.
 
-##### Chord table
+## CHORD TABLE
 
-Used by both `$` (indices 10-35) and `=` (indices a-z / A-Z):
+Used by `=` for all 36 indices (`0`-`9` plus `a`-`z` / `A`-`Z`) and by `$` for indices 10-35 only (the chord glyphs). For `$`, indices `0`-`9` mean **scales** instead. See the Scale Table below.
 
-| Index | Glyph | Chord | Intervals |
-|-------|-------|-------|-----------|
-| 10 | `a` | Major | 0 4 7 |
-| 11 | `b` | Minor | 0 3 7 |
-| 12 | `c` | Sus4 | 0 5 7 |
-| 13 | `d` | Sus2 | 0 2 7 |
-| 14 | `e` | Major7 | 0 4 7 11 |
-| 15 | `f` | Minor7 | 0 3 7 10 |
-| 16 | `g` | Dom7 | 0 4 7 10 |
-| 17 | `h` | MinorMaj7 | 0 3 7 11 |
-| 18 | `i` | Minor6 | 0 3 7 9 |
-| 19 | `j` | Major6 | 0 4 7 9 |
-| 20 | `k` | Major9 | 0 4 7 11 14 |
-| 21 | `l` | Minor9 | 0 3 7 10 14 |
-| 22 | `m` | Major add9 | 0 4 7 14 |
-| 23 | `n` | Minor add9 | 0 3 7 14 |
-| 24 | `o` | Dim | 0 3 6 |
-| 25 | `p` | Half Dim7 | 0 3 6 10 |
-| 26 | `q` | Dim7 | 0 3 6 9 |
-| 27 | `r` | Aug | 0 4 8 |
-| 28 | `s` | Aug7 | 0 4 8 10 |
-| 29 | `t` | Dom9 | 0 4 7 10 14 |
-| 30 | `u` | Dom7♭9 | 0 4 7 10 13 |
-| 31 | `v` | Dom7♯9 | 0 4 7 10 15 |
-| 32 | `w` | Major 6/9 | 0 4 7 9 14 |
-| 33 | `x` | Minor 6/9 | 0 3 7 9 14 |
-| 34 | `y` | Minor11 | 0 3 7 10 17 |
-| 35 | `z` | Minor7♭5 | 0 3 6 10 |
+Indices 10-35: lowercase glyph = root position; **UPPERCASE = first inversion** (the original root is bumped up an octave so the 3rd sits in the bass and the root sits on top: classical 1st inversion). Both `$` and `=` apply the inversion identically.
 
-For `=`, indices `0`-`9` are **octave-thickened** voicings, triads fattened with octaves above/below the root, then progressively reduced down to pure octave stacks. The pattern: Up / Down / Both → fifth → power → octave pair → octave triple. Negative intervals shift below the root; if the root is too low, the note octaves up to stay in MIDI range (clamping is symmetric for high-octave overflow).
+Indices 0-9 are `=`-only **octave-thickened** voicings: triads fattened with octaves above/below the root, then progressively reduced down to pure octave stacks. Pattern: Up / Down / Both → fifth → power → octave pair → octave triple. Negative intervals shift below the root; if the root is too low to fit, the note octaves up to stay in MIDI range. These don't have an inversion form (no uppercase digit glyphs).
 
-| Index | Glyph | Voicing | Intervals |
-|-------|-------|---------|-----------|
-| 0 | `0` | Major + OctUp | 0 4 7 12 |
-| 1 | `1` | Minor + OctUp | 0 3 7 12 |
-| 2 | `2` | Major + OctDown | -12 0 4 7 |
-| 3 | `3` | Minor + OctDown | -12 0 3 7 |
-| 4 | `4` | Major Spread | 0 7 12 16 |
-| 5 | `5` | Minor Spread | 0 7 12 15 |
-| 6 | `6` | Fifth | 0 7 |
-| 7 | `7` | Power (Fifth + OctUp) | 0 7 12 |
-| 8 | `8` | OctPair | 0 12 |
-| 9 | `9` | OctTriple | -12 0 12 |
+For `=`, an empty chord port = `0 12 24` (Octaves stack: root + 1 oct + 2 oct).
+
+| Index | Glyph | Chord / Voicing | Root pos (lowercase) | First inv (UPPERCASE) |
+|---|---|---|---|---|
+| 0 | `0` | Major + OctUp (`=` only) | 0 4 7 12 | - |
+| 1 | `1` | Minor + OctUp (`=` only) | 0 3 7 12 | - |
+| 2 | `2` | Major + OctDown (`=` only) | -12 0 4 7 | - |
+| 3 | `3` | Minor + OctDown (`=` only) | -12 0 3 7 | - |
+| 4 | `4` | Major Spread (`=` only) | 0 7 12 16 | - |
+| 5 | `5` | Minor Spread (`=` only) | 0 7 12 15 | - |
+| 6 | `6` | Fifth (`=` only) | 0 7 | - |
+| 7 | `7` | Power, Fifth + OctUp (`=` only) | 0 7 12 | - |
+| 8 | `8` | OctPair (`=` only) | 0 12 | - |
+| 9 | `9` | OctTriple (`=` only) | -12 0 12 | - |
+| 10 | `a` / `A` | Major | 0 4 7 | 4 7 12 |
+| 11 | `b` / `B` | Minor | 0 3 7 | 3 7 12 |
+| 12 | `c` / `C` | Sus4 | 0 5 7 | 5 7 12 |
+| 13 | `d` / `D` | Sus2 | 0 2 7 | 2 7 12 |
+| 14 | `e` / `E` | Major7 | 0 4 7 11 | 4 7 11 12 |
+| 15 | `f` / `F` | Minor7 | 0 3 7 10 | 3 7 10 12 |
+| 16 | `g` / `G` | Dom7 | 0 4 7 10 | 4 7 10 12 |
+| 17 | `h` / `H` | MinorMaj7 | 0 3 7 11 | 3 7 11 12 |
+| 18 | `i` / `I` | Minor6 | 0 3 7 9 | 3 7 9 12 |
+| 19 | `j` / `J` | Major6 | 0 4 7 9 | 4 7 9 12 |
+| 20 | `k` / `K` | Major9 | 0 4 7 11 14 | 4 7 11 14 12 |
+| 21 | `l` / `L` | Minor9 | 0 3 7 10 14 | 3 7 10 14 12 |
+| 22 | `m` / `M` | Major add9 | 0 4 7 14 | 4 7 14 12 |
+| 23 | `n` / `N` | Minor add9 | 0 3 7 14 | 3 7 14 12 |
+| 24 | `o` / `O` | Dim | 0 3 6 | 3 6 12 |
+| 25 | `p` / `P` | Half Dim7 | 0 3 6 10 | 3 6 10 12 |
+| 26 | `q` / `Q` | Dim7 | 0 3 6 9 | 3 6 9 12 |
+| 27 | `r` / `R` | Aug | 0 4 8 | 4 8 12 |
+| 28 | `s` / `S` | Aug7 | 0 4 8 10 | 4 8 10 12 |
+| 29 | `t` / `T` | Dom9 | 0 4 7 10 14 | 4 7 10 14 12 |
+| 30 | `u` / `U` | Dom7♭9 | 0 4 7 10 13 | 4 7 10 13 12 |
+| 31 | `v` / `V` | Dom7♯9 | 0 4 7 10 15 | 4 7 10 15 12 |
+| 32 | `w` / `W` | Major 6/9 | 0 4 7 9 14 | 4 7 9 14 12 |
+| 33 | `x` / `X` | Minor 6/9 | 0 3 7 9 14 | 3 7 9 14 12 |
+| 34 | `y` / `Y` | Minor11 | 0 3 7 10 17 | 3 7 10 17 12 |
+| 35 | `z` / `Z` | Minor7♭5 | 0 3 6 10 | 3 6 10 12 |
+
+For `=` the inverted chord is voiced ascending (notes never overlap), so the result is always a clean stacked chord. For `$` walking degrees 0..N produces those intervals as a sequential melody: degree 0 plays the new bass, and the wrapped-back original root plays an octave higher than root position would.
+
+## SCALE TABLE
+
+Complete `$` operator reference: every glyph the Scale/Chord port accepts. Indices `0`-`9` are scales (unique to `$`); indices 10-35 are chords shared verbatim with `=` (repeated here for convenience so you don't have to scroll to the Chord Table).
+
+For `$`, an empty Scale/Chord port = Chromatic (all 12 semitones).
+
+For chord glyphs (10-35): lowercase = root position, **UPPERCASE = first inversion** (3rd in bass, original root bumped up an octave). Walking degrees with `$` produces the intervals as a sequential melody.
+
+| Index | Glyph | Scale / Chord | Root pos (lowercase) | First inv (UPPERCASE) |
+|---|---|---|---|---|
+| (empty) | `.` | Chromatic | 0 1 2 3 4 5 6 7 8 9 10 11 | - |
+| 0 | `0` | Scale: Major | 0 2 4 5 7 9 11 | - |
+| 1 | `1` | Scale: Minor | 0 2 3 5 7 8 10 | - |
+| 2 | `2` | Scale: Lydian | 0 2 4 6 7 9 11 | - |
+| 3 | `3` | Scale: Dorian | 0 2 3 5 7 9 10 | - |
+| 4 | `4` | Scale: Mixolydian | 0 2 4 5 7 9 10 | - |
+| 5 | `5` | Scale: Hirajoshi | 0 2 3 7 8 | - |
+| 6 | `6` | Scale: Pentatonic | 0 2 4 7 9 | - |
+| 7 | `7` | Scale: Tetratonic | 0 3 5 7 | - |
+| 8 | `8` | Scale: Fifths | 0 7 | - |
+| 9 | `9` | Scale: Iwato | 0 1 5 6 10 | - |
+| 10 | `a` / `A` | Chord: Major | 0 4 7 | 4 7 12 |
+| 11 | `b` / `B` | Chord: Minor | 0 3 7 | 3 7 12 |
+| 12 | `c` / `C` | Chord: Sus4 | 0 5 7 | 5 7 12 |
+| 13 | `d` / `D` | Chord: Sus2 | 0 2 7 | 2 7 12 |
+| 14 | `e` / `E` | Chord: Major7 | 0 4 7 11 | 4 7 11 12 |
+| 15 | `f` / `F` | Chord: Minor7 | 0 3 7 10 | 3 7 10 12 |
+| 16 | `g` / `G` | Chord: Dom7 | 0 4 7 10 | 4 7 10 12 |
+| 17 | `h` / `H` | Chord: MinorMaj7 | 0 3 7 11 | 3 7 11 12 |
+| 18 | `i` / `I` | Chord: Minor6 | 0 3 7 9 | 3 7 9 12 |
+| 19 | `j` / `J` | Chord: Major6 | 0 4 7 9 | 4 7 9 12 |
+| 20 | `k` / `K` | Chord: Major9 | 0 4 7 11 14 | 4 7 11 14 12 |
+| 21 | `l` / `L` | Chord: Minor9 | 0 3 7 10 14 | 3 7 10 14 12 |
+| 22 | `m` / `M` | Chord: Major add9 | 0 4 7 14 | 4 7 14 12 |
+| 23 | `n` / `N` | Chord: Minor add9 | 0 3 7 14 | 3 7 14 12 |
+| 24 | `o` / `O` | Chord: Dim | 0 3 6 | 3 6 12 |
+| 25 | `p` / `P` | Chord: Half Dim7 | 0 3 6 10 | 3 6 10 12 |
+| 26 | `q` / `Q` | Chord: Dim7 | 0 3 6 9 | 3 6 9 12 |
+| 27 | `r` / `R` | Chord: Aug | 0 4 8 | 4 8 12 |
+| 28 | `s` / `S` | Chord: Aug7 | 0 4 8 10 | 4 8 10 12 |
+| 29 | `t` / `T` | Chord: Dom9 | 0 4 7 10 14 | 4 7 10 14 12 |
+| 30 | `u` / `U` | Chord: Dom7♭9 | 0 4 7 10 13 | 4 7 10 13 12 |
+| 31 | `v` / `V` | Chord: Dom7♯9 | 0 4 7 10 15 | 4 7 10 15 12 |
+| 32 | `w` / `W` | Chord: Major 6/9 | 0 4 7 9 14 | 4 7 9 14 12 |
+| 33 | `x` / `X` | Chord: Minor 6/9 | 0 3 7 9 14 | 3 7 9 14 12 |
+| 34 | `y` / `Y` | Chord: Minor11 | 0 3 7 10 17 | 3 7 10 17 12 |
+| 35 | `z` / `Z` | Chord: Minor7♭5 | 0 3 6 10 | 3 6 10 12 |
 
 ---
 
@@ -1127,15 +1178,15 @@ Every parameter set via `!` in the grid is marked as **sequencer-controlled** (s
 - **On-screen keyboard** - available on the Sequencer screen for handheld / no-keyboard use. Instrument pages use Shift+Arrow / South+D-pad and (on desktop) direct alphanumeric entry.
 - **Save / load** - `.grampus` project files store the grid, all track params, master params, BPM, seed, tick rate, and shuffle. Plain human-readable text. Older project files load cleanly across versions.
 - **Track presets** - each track page has a one-row strip across the top: `TRACK: <name>` on the left, `[ SAVE ]` in the middle, `[ LOAD ]` on the right. Press Enter (or South on the gamepad) to activate the focused slot:
-  - `TRACK:` opens a small text dialog so you can rename the track. The name is just a label — no file is touched.
+  - `TRACK:` opens a small text dialog so you can rename the track. The name is just a label, no file is touched.
   - `[ SAVE ]` writes the current track's full state (engine, OSC, AMP/FILTER, FX/MIX, all three LFOs) to a `.grampustrack` file inside `data_dir/presets/`. If a preset with the same name already exists, you get an overwrite prompt.
   - `[ LOAD ]` opens a file browser sandboxed to `data_dir/presets/`. Pick a preset and the whole track is replaced with the preset's state. One Ctrl+Z rolls the load back atomically.
 
-  **Presets are independent of projects.** A track's full state always lives in the project file itself, so loading a preset is a one-shot copy: the params get stamped onto the track and from that moment on they belong to the project, not to the preset file. There's no link kept between the two. Overwriting a preset later does **not** retroactively change any project that previously loaded it. Likewise, deleting a preset doesn't break any project — the project still plays the same because every value is stored locally.
+  **Presets are independent of projects.** A track's full state always lives in the project file itself, so loading a preset is a one-shot copy: the params get stamped onto the track and from that moment on they belong to the project, not to the preset file. There's no link kept between the two. Overwriting a preset later does **not** retroactively change any project that previously loaded it. Likewise, deleting a preset doesn't break any project. The project still plays the same because every value is stored locally.
 
-  **Factory presets** ship inside `data_dir/presets/_factory_presets/`. They're refreshed from the bundled set every launch (so app updates can ship new ones cleanly). Your own saves live in `data_dir/presets/` itself, never inside the `_factory_presets` subfolder — even when you edit a factory preset and save it under the same name, the new file lands in the user folder, leaving the factory copy untouched.
+  **Factory presets** ship inside `data_dir/presets/_factory_presets/`. They're refreshed from the bundled set every launch (so app updates can ship new ones cleanly). Your own saves live in `data_dir/presets/` itself, never inside the `_factory_presets` subfolder. Even when you edit a factory preset and save it under the same name, the new file lands in the user folder, leaving the factory copy untouched.
 
-  Filenames are limited to 32 characters (excluding the `.grampustrack` extension); empty names are silently ignored. Older save files with longer names still load fine — the limit only applies to new saves.
+  Filenames are limited to 32 characters (excluding the `.grampustrack` extension); empty names are silently ignored. Older save files with longer names still load fine. The limit only applies to new saves.
 - **WAV recording** - `F10` (or R1+Start on the gamepad) toggles recording of the master output to `data_dir/recordings/<project>_<YYYYMMDD_HHMMSS>.wav`. 16-bit PCM stereo with TPDF dithering, headers patched after every chunk so the file is always valid even mid-take.
 - **Toggle comment region** - Algorave style live mute (typical trick for Tidal Cycles/Strudel). Make a selection, press `/` (or L1+R1 on the gamepad), and grampus wraps each row of the rect with `#` (ORCA's comment operator) - silencing everything between. Press again on a wrapped selection to clear the `#`s. Refuses to overwrite real glyphs at the edges.
 - **Envelopes**: the amp envelope and filter envelope each have three stages: Attack, Hold, Decay. Both follow the same rule: the **Hold value** determines the entire shape, independently of note length.
