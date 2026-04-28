@@ -33,6 +33,7 @@ Grampus runs on macOS, Linux, Windows, and small-form-factor Linux handhelds. It
   - [LoFiTron (EngType 5)](#lofitron-engtype-5)
   - [WaveSurf (EngType 6)](#wavesurf-engtype-6)
   - [SynDrums (EngType 7)](#syndrums-engtype-7)
+  - [BoneSaw (EngType 8)](#bonesaw-engtype-8)
 - [Shared voice chain](#shared-voice-chain)
 - [Drive models](#drive-models)
 - [LFO system](#lfo-system)
@@ -445,7 +446,7 @@ Tempo-synced LFO. Runs every tick. Resets its phase on a neighbouring bang or wh
 |  output  |       |     |      |       |
 
 - **A / B** - output range. If `A > B` they swap; the LFO always interpolates between `min(A,B)` and `max(A,B)`.
-- **R** - rate, 0-35. Indexes a **16-entry musical cycle table**; higher values = faster cycles (from thousands of ticks per cycle down to 1 tick per cycle).
+- **R** - rate, 0-35. Indexes a 36-entry tempo-synced cycle table shared with the LFO Rate slots; higher values = faster cycles. See the [Rate table](#rate-table-shared-by-bouncer-and-lfos) for full speeds. The Bouncer can't fire faster than once per sequencer tick, so the sub-tick fast values (`x`/`y`/`z` = `1`/`0.125`/`0.0625` ticks) all collapse to a 1-tick cycle on the Bouncer (LFOs use them at the audio-rate speeds the table actually advertises).
 - **S** - shape 0-7: `0` Tri · `1` InvTri · `2` Sine · `3` InvSine · `4` Square · `5` InvSquare · `6` Saw · `7` InvSaw.
 
 ## CHORD TABLE
@@ -634,7 +635,7 @@ Transient activation signal. Auto-clears one tick after it is placed or produced
 
 Each of the eight tracks runs one synth engine at a time. Switching the engine on a track (`EngType`, param 0) swaps the voice and restores the last preset you had on that engine for that track, so you can A/B engines without losing your tweaks. Polyphony is **8 voices per track** for every engine type; the same envelope, filter, drive, and routing follow regardless of which engine you pick.
 
-Five engines ship today:
+Nine engines ship today:
 
 ### Drifter (EngType 0)
 
@@ -906,30 +907,92 @@ A drum-synthesis voice with five built-in models (kick, snare, clap, toms, cymba
 
 ---
 
+### BoneSaw (EngType 8)
+
+A **Roland JP-8000-inspired SuperSaw** engine. Seven detuned saws (one centre + six sides at fixed Roland-derived ratios) summed together, a sub-oscillator for low-end weight, and a per-saw hard-sync section that goes well past anything the original instrument could produce. The detune curve is the actual JP-8000 polynomial measured by Adam Szabo, applied as a Hz offset rather than a pitch ratio - which is why the same SWARM setting feels wider on low notes than on high notes. That uneven-across-the-keyboard character is the signature of a real SuperSaw: huge fat bass, focused upper register.
+
+| # | Name | Polarity | Role |
+|---|------|----------|------|
+| 1 | SHIFT | bipolar | Volume balance between the three negative-detune sides and the three positive-detune sides. **`h` = balanced (equal both groups)**. Below `h` favours the negative-detune sides (slightly flatter ensemble); above `h` favours the positive-detune sides (slightly sharper ensemble). The centre saw is unaffected. Subtle on its own; mainly useful with STEREO for asymmetric stereo placement of the ensemble. |
+| 2 | SWARM | unipolar | Detune amount across all six side oscillators. **`0` = unison (all 7 saws at the same pitch, super-thick mono saw)**, **`h` = classic JP-8000 SuperSaw spread (~8 cents at A4, ~55 cents at C2 - the sound of every '90s trance lead)**, **`z` = max width (~20 cents at A4, ~133 cents at C2 - wider than the original instrument permits)**. The detune amount in cents grows automatically as you go down the keyboard, so bass notes feel huge while treble notes stay focused. |
+| 3 | STEREO | bipolar | Pans the side saws across L/R based on the sign of their detune coefficient. **`h` = mono centre (all sides on top of each other)**. Magnitude pushes the negatives to one channel and positives to the other; polarity (above/below `h`) decides which group goes which way. Centre saw stays mono. Combine with SWARM > 0 for instant wide stereo SuperSaw pads. |
+| 4 | SUBOSC | bipolar | Sub-oscillator level + octave selector. **`h` = off (no sub)**. Below `h`: sub is **two octaves below** the played note, magnitude controls level. Above `h`: sub is **one octave below**, magnitude controls level. The sub is intentionally NOT detuned and NOT synced - it stays clean and centred to keep the low end rock-solid even when the supersaw above it is wide and chaotic. |
+| 5 | SHAPE | unipolar | Saw → square morph applied to all 8 oscillators (7 saws + sub). **`0` = pure saw (the classic SuperSaw timbre)**, **`z` = pure square (more hollow, PWM-pad-ish character)**. Anywhere between linearly crossfades. Subtle deflections feel like the saw has a slight hollowness; full deflection is genuinely a different timbre - try it on pads. |
+| 6 | SYNC | unipolar | Per-saw hard sync. Each of the 7 saws gets a hidden slave oscillator running 1× to 4× its own frequency; the slave's phase resets every time its master saw cycles. **`0` = no sync (identical to a vanilla SuperSaw)**, **`z` = max sync ratio (4×, aggressive resonant sweep with a metallic "talking" character)**. Stays tonal at every setting - perceived pitch is locked to each saw's own frequency. This knob is what differentiates BoneSaw from a stock SuperSaw clone: a full 0-z SYNC sweep with FltCut wide open is the BoneSaw signature move. |
+
+**Common combos:**
+- *Classic JP-8000 trance lead*: SWARM `h`, STEREO `q`, SUBOSC `h`, SHAPE `0`, SYNC `0`. Long Amp release, FltCut wide open. The "Children of '95" sound.
+- *Ultra-wide SuperSaw pad*: SWARM `s`, STEREO `z`, SUBOSC `m` (one-octave sub at moderate level), SHAPE `5` (slight squareness), SYNC `0`. Slow Amp attack (`AmpAtk` `j`), long release.
+- *Resonant sync lead*: SWARM `e` (tight unison-ish), STEREO `h`, SUBOSC `h`, SHAPE `0`, SYNC `r`. Sweep FltCut while playing for the classic sync filter sweep.
+- *Sub bass + thick saw*: SWARM `0` (true unison - just one fat saw), SUBOSC `c` (two-octave sub at strong level), SHAPE `0`, SYNC `0`. BoneSaw functions as a single-osc-with-sub bass synth at SWARM=0.
+- *Aggressive hardstyle stab*: SWARM `s`, STEREO `q`, SUBOSC `q`, SHAPE `0`, SYNC `n`. Snappy Amp envelope (`AmpAtk` `0`, `AmpHld` `4`, `AmpDcy` `0`), heavy Drive on top.
+- *PVox + BoneSaw signature*: BoneSaw at any combo above + `FltTyp` `9` (PVox BP), `FltRes` mid-to-high. The Polivoks BP filter on top of a synced supersaw is genuinely unhinged.
+
+> **Sweet spot tip.** SWARM `h` is calibrated to feel like a stock JP-8000 SuperSaw at typical detune-knob position - the kind of sound that defined trance and progressive house. Below `h` the ensemble tightens up toward unison; above `h` it goes wider than the original synth ever permitted, into territory that feels almost like a chord. The whole knob is musical, but `h` is "home base".
+
+Character: classic '90s SuperSaw at SWARM `h`, focused mono saw at SWARM `0`, otherworldly wide chord-like ensemble above SWARM `h`. SYNC adds a metallic resonant sweep that the original JP-8000 couldn't do on its own. Sub-oscillator is rock-solid clean regardless of what the saws above it are doing.
+
+---
+
 ## Shared voice chain
 
 Every voice, regardless of type, passes through the same chain:
 
 - **AHD envelope** (params 10-12: AmpAtk / AmpHld / AmpDcy)
-  - Custom time curve: hand-picked 0-12 (10 ms → 750 ms), exponential 13-35 (1 s → 24 s).
+  - Hand-picked time curve, dense in the snappy region: see the [Envelope time table](#envelope-time-table) below.
   - **`AmpHld = 0` → INF (gate mode)**: level stays at peak until note-off arrives, then Decay runs. Default. Use for sustained notes, pads, leads.
   - **`AmpHld = 1..z` → AHD (auto-decay)**: Atk → Hld (dwell) → Dcy fires automatically regardless of note length. Use for drums, plucks, blips, the envelope shape defines the sound duration.
 - **True-stereo MultiFilter** (params 13-15: FltTyp / FltCut / FltRes) - independent L/R filter instances:
   - 0 Off (passthrough)
-  - 1 **Moog LP** (4-pole ladder, 24 dB/oct)
-  - 2 **SVF HP** (2-pole)
-  - 3 **SVF BP** (2-pole)
-  - 4 **SVF Notch** (cascaded 4-pole)
+  - 1 **Moog LP** (4-pole ladder, 24 dB/oct) - the classic warm transistor-ladder character.
+  - 2 **SVF HP** (2-pole, 12 dB/oct)
+  - 3 **SVF BP** (2-pole, 12 dB/oct)
+  - 4 **SVF Notch** (cascaded 4-pole, 24 dB/oct)
   - 5 **LP>HP** (serial 1-pole LP → 1-pole HP - band-pass-ish)
   - 6 **DJ Filter** (bipolar: cutoff center = bypass, below = LP, above = HP)
+  - 7 **PVox LP** - Polivoks-inspired modelling filter, low-pass tap.
+  - 8 **PVox HP** - same Polivoks topology, high-pass tap.
+  - 9 **PVox BP** - same Polivoks topology, band-pass tap (the most overtly resonant of the three).
   - Cutoff: 20 Hz - ~20 kHz mapped across 0-z. Parameter smoothing (~5 ms one-pole) eliminates zipper noise.
-- **Filter envelope** (params 16-19: FEnvAm / FEnvAt / FEnvHl / FEnvDc) - bipolar amount, modulates filter cutoff in normalized space. Only triggers when amount ≠ 0.
+
+  > **About the PVox family.** Inspired by the Soviet Formanta Polivoks - a synth famous for the snarling vocal "bite" of its filter. The defining feature is an **asymmetric diode-pair feedback path** that replaces the linear resonance loop of a normal SVF. At low FltRes the filter is gentle and clean; as you push FltRes up, the feedback path saturates harder and harder, FltRes acts as both Q **and** drive at the same time. The asymmetric clipping shape leaks even-order harmonics into the resonance, which is what produces the singing, almost-vocal quality. Past about FltRes `r` the filter starts to overtly distort - this is the "bite". Internally 2x oversampled around the nonlinear core to keep aliasing out of the saturation; loudness is auto-compensated post-filter so cranking FltRes gets gnarly without getting unmanageably loud. Try it on saw leads, plucks, and anything with rich high-frequency content - it transforms ordinary patches into something with attitude.
+- **Filter envelope** (params 16-19: FEnvAm / FEnvAt / FEnvHl / FEnvDc) - bipolar amount, modulates filter cutoff in normalized space. Only triggers when amount ≠ 0. Atk/Hld/Dcy share the same time table as the amp envelope (see [Envelope time table](#envelope-time-table) below). Special case at FEnvAt=0: the filter envelope **truly snaps** to peak with no anti-click ramp (filter cutoff has no click risk, unlike amplitude), giving you instant Roland-style filter stabs.
 - **Per-track tilt EQ** (param 28: `S>Tone`) - bipolar one-pole tilt inserted right after the per-track compressor. `h` (centre) is bypass; values below `h` roll off highs (LP), values above roll off lows (HP). Same shape as the master Delay/Reverb tone controls. Useful for gentle per-track mix shaping (e.g. dipping the subs of a snare or trimming hiss off cymbals) without a separate FX module.
 - **Per-track stereo chorus** (param 27: `R>Chorus`) - bipolar single-knob chorus inserted post-drive. `h` (centre) is bypass. **Negative side** ramps a "warm/Juno-style" chorus with **2.5/3.75/5/6.25 ms** base delays - tight, classic. **Positive side** ramps a "spacey" chorus with **10/15/20/25 ms** base delays - wider, more dispersed. Magnitude scales depth (up to ~4.8 ms LFO swing), rate (0.3-1.0 Hz), feedback (0-50%), and wet mix together, so one slider gives you a cohesive musical sound at any setting. Feedback ramps slightly faster than depth/rate so the resonant character builds in earlier - matches the mental model that pushing the slider further means more obvious chorus, not just louder dry-vs-wet. Internally: 4 LFO-modulated taps 90° apart, ~110 Hz HPF on the wet path keeps bass mono and out of the feedback loop. Costs ~2% of one CPU core per active track at 48 kHz; bypassed tracks are essentially free.
 - **Drive** (params 29 / 30: DrvMdl / Drive amount) - 11 modes, see the [Drive models](#drive-models) section below for the full breakdown.
 - **Sends** (params 31-33): DlySnd, RDlSnd, RevSnd - per-track wet amounts to the master buses.
 - **Pan** (param 34) - bipolar, `cos`/`sin` equal-power.
 - **Volume** (param 35) - dry output level.
+
+### Envelope time table
+
+Both the amp envelope (`AmpAtk` / `AmpHld` / `AmpDcy`) and the filter envelope (`FEnvAt` / `FEnvHl` / `FEnvDc`) read time values from the same hand-picked table below. Dense in the snappy region (5 of the first 12 glyphs cover 0-50 ms for fine control over percussive transients), still granular through the body region (175 ms to 6 s), reaching `z = 32 s` at the top.
+
+| Glyph | Time     | Glyph | Time     | Glyph | Time     | Glyph | Time     |
+|-------|----------|-------|----------|-------|----------|-------|----------|
+| `0`   | 0 (special, see below) | `9` | 125 ms | `i` | 600 ms | `r` | 5.0 s |
+| `1`   | **2.5 ms** | `a` | 150 ms | `j` | 750 ms | `s` | 6.0 s |
+| `2`   | 5 ms      | `b` | 175 ms | `k` | 1.0 s  | `t` | 7.5 s |
+| `3`   | 10 ms     | `c` | 200 ms | `l` | 1.25 s | `u` | 10.0 s |
+| `4`   | 20 ms     | `d` | 250 ms | `m` | 1.5 s  | `v` | 12.5 s |
+| `5`   | 30 ms     | `e` | 300 ms | `n` | 2.0 s  | `w` | 16.0 s |
+| `6`   | 50 ms     | `f` | 350 ms | `o` | 2.5 s  | `x` | 20.0 s |
+| `7`   | 75 ms     | `g` | 400 ms | `p` | 3.0 s  | `y` | 24.0 s |
+| `8`   | 100 ms    | `h` | 500 ms | `q` | 4.0 s  | `z` | 32.0 s |
+
+**Value `0` special cases** (different meaning per slot):
+
+- **AmpAtk (10) / AmpDcy (12)**: `0` means "as fast as possible without clicking". Internally clamped to a 1 ms anti-click floor (a literal zero-sample ramp on amplitude pops, so we never let those go below 1 ms).
+- **AmpHld (11)**: `0` is the **INF / gate-mode marker**: level holds at peak until note-off arrives. Default. Any value `1..z` is a finite hold dwell that auto-decays after the time elapses.
+- **FEnvAt (17)**: `0` is a **true instant snap** (no anti-click floor; filter cutoff has no click risk). Roland-style hard-snap filter envelopes.
+- **FEnvHl (18)**: same INF behavior as AmpHld. `0` waits at peak for note-off.
+- **FEnvDc (19)**: 1 ms anti-click floor at `0`, same idea as AmpDcy.
+
+**Practical recipes**:
+
+- *Snappy percussive amp env*: `AmpAtk = 0`, `AmpHld = 4` (20 ms dwell), `AmpDcy = 6` (50 ms tail). Quick stab, no sustain needed.
+- *Pad with slow filter sweep*: `AmpHld = 0` (gate mode), `AmpDcy = h` (500 ms release), `FEnvAm` open positive, `FEnvAt = j` (750 ms slow open), `FEnvHl = 0` (filter sustains while note held), `FEnvDc = h` (500 ms close on release).
+- *Hard filter stab*: `FEnvAt = 0` (true snap), `FEnvHl = 4` (20 ms hold), `FEnvDc = 6` (50 ms close), `FEnvAm` open positive. Instant filter chirp on every note.
 
 ---
 
@@ -1046,7 +1109,7 @@ Each LFO claims a pair of grid params:
 
 **Dep slots (`K` / `M` / `O`)** are bipolar centred on `h`. They behave specially: the visible base value stays pinned at `h`, but writes to it (manual or `!`) update **all three of the LFO's stored per-target depths uniformly**. So if your LFO is routed to filter cutoff, drive amount, and sends, `!K17` is unison neutral, `!Kz` boosts every target's depth uniformly, and `!K0` inverts every target's depth. Lets a single grid write swing the entire LFO output without editing each target depth individually. Other LFOs can also modulate `K/M/O` for "depth modulation" (LFO modulating LFO).
 
-**Rate slots (`L` / `N` / `P`)** are unipolar `0..z`. The base-36 value indexes the same rate lookup table the Bouncer (`&`) uses, so `0` is 4096 ticks per cycle (very slow), `h` is 32 ticks (~4 s/cycle at BPM 120 Normal), and `z` is 1 tick per cycle (8 Hz at BPM 120 Normal). Cycle length is in ticks, so it always tempo-syncs.
+**Rate slots (`L` / `N` / `P`)** are unipolar `0..z`. The base-36 value indexes a tempo-synced cycle table (same one the Bouncer `&` uses): `0` is 4096 ticks per cycle (very slow drift), `h` is 32 ticks (≈ 4 s/cycle at BPM 120 Normal: the default and the comfortable "musical pad" speed), `w` is 4 ticks (= quarter note, the last "musical" stop), and `x`/`y`/`z` are sub-tick fast values for sound design (`x` = 8 Hz, `y` = 64 Hz, `z` = 128 Hz at BPM 120 Normal). Cycle length is in ticks, so the LFO always tempo-syncs as you change BPM or TickRate. Full speeds at every glyph live in the [Rate table](#rate-table-shared-by-bouncer-and-lfos) below.
 
 ### Per-LFO parameters
 
@@ -1088,6 +1151,62 @@ Controls how the LFO responds to NoteOn events on its track:
 - **ONCE**: phase resets to `0` on NoteOn, then **freezes at the end of the first cycle**. The LFO runs through one full pass and stops. Effectively a one-shot envelope generator. SH-S's seeded sequence also restarts from cycle 0 on TRIG / ONCE so retriggers replay the same pattern.
 
 `Ctrl+R` (sequencer reset) jumps FREE and TRIG LFOs back to phase 0 and clears their scopes; ONCE LFOs are left untouched so a long one-shot in flight isn't interrupted.
+
+### Rate table (shared by Bouncer and LFOs)
+
+The Bouncer (`&`) Rate port and the per-track LFO Rate slots (`L` / `N` / `P`) both look up cycle length in this table. The cycle is always expressed in **ticks**, so changing BPM or TickRate scales every entry by the same factor, keeping things tempo-synced.
+
+**How to read the period column**: at BPM 120 Normal (1 tick = 125 ms / 8 ticks per second). Other tempos: multiply periods by `120/BPM`. TickRate `Half` doubles all periods, `Double` halves them.
+
+| Glyph | Ticks    | LFO period @120 Normal | LFO frequency | Musical equivalent       |
+|-------|----------|------------------------|---------------|--------------------------|
+| `0`   | 4096     | 512 s                  | 0.00195 Hz    | 256 bars                 |
+| `1`   | 3072     | 384 s                  | 0.00260 Hz    | 192 bars                 |
+| `2`   | 2048     | 256 s                  | 0.00391 Hz    | 128 bars                 |
+| `3`   | 1536     | 192 s                  | 0.00521 Hz    | 96 bars                  |
+| `4`   | 1024     | 128 s                  | 0.00781 Hz    | 64 bars                  |
+| `5`   | 768      | 96 s                   | 0.01042 Hz    | 48 bars                  |
+| `6`   | 512      | 64 s                   | 0.01563 Hz    | 32 bars                  |
+| `7`   | 384      | 48 s                   | 0.02083 Hz    | 24 bars                  |
+| `8`   | 256      | 32 s                   | 0.03125 Hz    | 16 bars                  |
+| `9`   | 192      | 24 s                   | 0.04167 Hz    | 12 bars                  |
+| `a`   | 160      | 20 s                   | 0.05000 Hz    | 10 bars                  |
+| `b`   | 128      | 16 s                   | 0.06250 Hz    | 8 bars                   |
+| `c`   | 96       | 12 s                   | 0.08333 Hz    | 6 bars                   |
+| `d`   | 80       | 10 s                   | 0.10000 Hz    | 5 bars                   |
+| `e`   | 64       | 8 s                    | 0.12500 Hz    | 4 bars                   |
+| `f`   | 48       | 6 s                    | 0.16667 Hz    | 3 bars                   |
+| `g`   | 40       | 5 s                    | 0.20000 Hz    | 2.5 bars                 |
+| `h`   | 32       | 4 s                    | 0.25000 Hz    | 2 bars *(default)*       |
+| `i`   | 24       | 3 s                    | 0.33333 Hz    | 1.5 bars (dotted whole)  |
+| `j`   | 20       | 2.5 s                  | 0.40000 Hz    | 1.25 bars                |
+| `k`   | 16       | 2 s                    | 0.50000 Hz    | whole note (1 bar)       |
+| `l`   | 15       | 1.875 s                | 0.53333 Hz    | quintuplet whole-ish     |
+| `m`   | 14       | 1.75 s                 | 0.57143 Hz    |                          |
+| `n`   | 13       | 1.625 s                | 0.61538 Hz    |                          |
+| `o`   | 12       | 1.5 s                  | 0.66667 Hz    | dotted half              |
+| `p`   | 11       | 1.375 s                | 0.72727 Hz    |                          |
+| `q`   | 10       | 1.25 s                 | 0.80000 Hz    |                          |
+| `r`   | 9        | 1.125 s                | 0.88889 Hz    |                          |
+| `s`   | 8        | 1.0 s                  | 1.00000 Hz    | half note                |
+| `t`   | 7        | 0.875 s                | 1.14286 Hz    |                          |
+| `u`   | 6        | 0.75 s                 | 1.33333 Hz    | dotted quarter           |
+| `v`   | 5        | 0.625 s                | 1.60000 Hz    |                          |
+| `w`   | **4**    | **0.5 s**              | **2.0 Hz**    | **quarter note** (last musical stop) |
+| `x`   | **1**    | **125 ms**             | **8 Hz**      | **fast tempo-locked** (vibrato/tremolo extreme) |
+| `y`   | **0.125**| **15.6 ms**            | **64 Hz**     | **audio-rate** (FM-ish timbral modulation; LFO only) |
+| `z`   | **0.0625**| **7.8 ms**            | **128 Hz**    | **sound-design ceiling** (near LFO Nyquist; LFO only) |
+
+**Two flavours of behaviour at the fast end**:
+
+- **`0` to `w`**: musically meaningful subdivisions: bars, beats, dotted/quintuplet variants. Both Bouncer and LFO interpret these identically. `h` is the default sweet spot for slow-evolving modulation.
+- **`x`**: the last whole-tick value (1 tick / 8 Hz at default). Tempo-locked. Both Bouncer and LFO use this directly.
+- **`y` / `z`**: sub-tick fractions for LFO sound design. The LFO runs at 480 Hz internally, so these advertise 64 Hz / 128 Hz audio-rate modulation that's perfectly usable on most params. The **Bouncer** can only advance once per sequencer tick, so `y` and `z` collapse to the same 1-tick cycle as `x` on the Bouncer (no crash, just no extra speed).
+
+**Practical ceilings** (when modulating with `y` / `z`):
+
+- Most params (volume, pan, drive amount, sends, voice oscillator slots) have no extra DSP smoothing, so they receive the full LFO output up to ~120 Hz. At `z` (128 Hz) you'll hear genuine audio-rate stepping/buzz that's perfect for sound design.
+- Filter cutoff (`FltCut`) and resonance (`FltRes`) have a built-in ~5 ms anti-zipper smoother, so they receive ~−1 dB at 100 Hz and ~−3 dB at 200 Hz. `y` and `z` still produce audible movement on the filter, just with progressively reduced depth. Sometimes that's exactly the spongey-resonance sound you want.
 
 ---
 
