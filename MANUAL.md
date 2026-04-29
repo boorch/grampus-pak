@@ -37,6 +37,7 @@ Grampus runs on macOS, Linux, Windows, and small-form-factor Linux handhelds. It
 - [Shared voice chain](#shared-voice-chain)
 - [Drive models](#drive-models)
 - [LFO system](#lfo-system)
+- [Scenes](#scenes)
 - [Master effects bus](#master-effects-bus)
 - [Parameter system](#parameter-system)
 - [Features](#features)
@@ -586,6 +587,28 @@ Plays an entire chord in one tick on a synth channel. Uses the chord table above
 
 Notes are voiced ascending (each chord tone is raised by octaves if needed to stay above the previous one).
 
+##### `^` - Strum
+
+Plays the same chord notes as `=` but staggered in time and walked in arpeggiator-pattern order. One bang fires one full pass of the pattern, like a guitarist sweeping across the strings. Same first six ports as `=`, plus a Pattern slot (identical to `%`'s pattern table) and a Strum Speed slot.
+
+| Operator | Channel | Octave | Root | Chord | Velocity | Length | Pattern | Speed |
+|:--------:|:-------:|:------:|:----:|:-----:|:--------:|:------:|:-------:|:-----:|
+|   `^`    |    C    |    O   |   R  |   T   |     V    |    L   |    P    |   S   |
+
+- **C / O / R / T / V / L** identical to `=`. Empty chord port (`T`) falls back to octave doubling. Uppercase `T` (any chord letter) gives first inversion.
+- **P** pattern, 0-13. Same table as `%` (Up / Down / Up-Down / Down-Up / Up-Down+ / Down-Up+ / Converge / Diverge / Pinky Up / Thumb Up / Up-Down Alt / Down-Up Alt / Random / Bounce). Each pattern's natural cycle plays exactly ONCE per bang. A 4-note chord with Up-Down+ produces 8 events (`1,2,3,4,4,3,2,1`); the same chord with Up-Down (no endpoint repeat) produces 6 events (`1,2,3,4,3,2`).
+- **S** strum speed (per-event spacing in ticks):
+  - `0` or `.` bypasses the pattern entirely. All notes fire simultaneously, identical to `=`.
+  - `1` to `9` are sub-tick fractions: `1/64`, `1/48`, `1/32`, `1/24`, `1/16`, `1/12`, `1/8`, `1/6`, `1/4` of one tick. Useful for humanisation (a 1/64-tick spacing on a 5-note chord is a barely-perceptible attack flam).
+  - `a` to `c` are short multiples: `1/2`, `1`, `1.5` ticks.
+  - `d` to `z` are linear in ticks: `2`, `3`, `4`, `5`, ..., `24` ticks per event. The lazy end (`z` = 24 ticks per event on a 5-note chord at default tempo) lasts about a second and a half.
+
+Random pattern (`P=c`) shuffles the chord's notes into a non-repeating permutation each bang, so every note plays exactly once but in a different order each time.
+
+When the pattern revisits a note that's still ringing (most patterns past Up / Down hit the same notes more than once per cycle), the operator sends a clean note-off before the re-trigger, so you don't get the double-strike artefact of two voices stacking on the same pitch.
+
+Re-banging the same `^` cell while a slow strum is still in flight cancels the queued events and starts the new strum on top. Already-ringing notes from the previous strum keep ringing until their natural Length expires, so chord changes overlap their decay tails like a real guitar.
+
 ##### `!` - SetParam
 
 Addresses the built-in synth engines' 36-slot parameter system directly. Differs from Orca-c / bOrca, where `!` is a MIDI CC operator.
@@ -647,14 +670,14 @@ Dual oscillator virtual-analog. Two PolyBLEP-anti-aliased oscillators (A and B) 
 | 2 | SkewA | bipolar | Phase-distortion knee for Osc A. **`h` = no skew (symmetric waveform)**. Below `h` skews the cycle so the first half is shorter than the second; above `h` does the opposite. Adds odd-order harmonics - for square waves it acts like PWM, for tri/saw it asymmetrises the timbre. |
 | 3 | ShapeB | bipolar | Same shape morph as ShapeA, applied independently to Osc B. Useful for layering two different waveforms (e.g. ShapeA at saw `h`, ShapeB at square `y`). |
 | 4 | SkewB | bipolar | Skew on Osc B. Independent from SkewA. |
-| 5 | BPitch | unipolar | Osc B pitch offset above Osc A, scaled linearly across **0 to +5 semitones** (`0` = unison, `z` = +5 semi). For unison detune, leave it at `0` and use Drift; for chord-stab intervals (octaves, fifths, etc.), set explicit values. |
+| 5 | BPitch | unipolar | Osc B pitch offset above Osc A, **1 semitone per glyph (0 to +35 semitones)**. `0` = unison, `7` = +7 semi (perfect 5th), `c` (12) = +1 octave, `o` (24) = +2 octaves, `z` = +35 (~3 octaves). For unison detune, leave it at `0` and use Drift; for chord-stab intervals, set explicit semitone values. |
 | 6 | Xfade | bipolar | A/B level balance. **`0` = Osc A only**, **`h` = equal mix (centre)**, **`y` = Osc B only**. |
 | 7 | Drift | unipolar | Brownian pitch instability - both oscillators wander slightly off-pitch over ~200-350 ms via a Gaussian random walk with a one-pole smoother. **`0` = locked pitch**, **`z` ≈ ±25 cents max wander**. Each oscillator drifts independently, so light Drift makes a single voice sound like two slightly-out-of-tune oscillators (the natural source of "analog" warmth). |
 | 8 | SubOsc | bipolar | Sub oscillator level + octave selector. **`h` = off**. Below `h`: sub is **two octaves below** Osc A, magnitude controls its level. Above `h`: sub is **one octave below**, magnitude controls level. Triangle waveform internally - sits clean under the main oscillators. |
 | 9 | Stereo | bipolar | Stereo spread by panning A and B in opposite directions via equal-power pan. **`h` = both centred (mono)**. Magnitude controls how hard they push to L/R. Combine with detune (BPitch + Drift) and/or per-osc shape differences for instant stereo width without an external chorus. |
 
 **Common combos:**
-- *Classic detuned saw lead*: ShapeA `h` (saw), ShapeB `h`, BPitch `3` (~+0.4 semi), Xfade `h`, Drift `8`.
+- *Classic detuned saw lead*: ShapeA `h` (saw), ShapeB `h`, BPitch `0` (unison), Xfade `h`, Drift `8`. For a fifth-up oscillator instead, set BPitch `7`.
 - *Hollow square pad*: ShapeA `t` (mostly square), ShapeB same, mild Skew differences (SkewA `m`, SkewB `g`), Stereo `r`, Drift `e`.
 - *Sub-bass*: ShapeA `b` (mostly triangle), ShapeB same, Xfade `h`, SubOsc `4` (two-octave-down at moderate level).
 - *"Living" pad*: heavy Drift (`m`-`r`), differentiated Skew between A and B, max Stereo, SubOsc `t` (one-octave-down).
@@ -678,39 +701,43 @@ Dual wavetable oscillator inspired by [Vital](https://vital.audio/). Each oscill
 
 Anything in between (e.g. `4` or `j`) crossfades between the two adjacent tables. So `4` is roughly halfway between Sine and SatSin; `j` is roughly halfway between Tri and Square. The morph is continuous, so you can park anywhere on the spectrum.
 
-**Warp modes** (WrpMdA and WrpMdB independently pick one of these - they're discrete, the slider shows the mode name). The Warp slider is **bipolar** - `h` (centre) is identity (raw wavetable, no warp). Each mode interprets the bipolar value as it makes sense:
+**Warp modes** (WrpMdA and WrpMdB independently pick one of these, discrete; the slider shows the mode name). The Warp slider is **bipolar**, `h` (centre) is identity (raw wavetable, no warp). Five modes warp the *phase* before the wavetable read (shape-aware), two warp the *amplitude* after the read (shape-agnostic):
 
-| Glyph | Mode | What it does | Slider behaviour |
-|-------|------|--------------|------------------|
-| `0` | **Bend** | Phase exponent (`power = 8^amount`). Stretches one half of the cycle and compresses the other. | **bipolar** - below `h` compresses the end (concave), above `h` compresses the start (convex). |
-| `1` | **Sync** | Hard-sync simulation (1× to 32× phase multiplier). Adds inharmonic partials and chirpy aliasing reminiscent of analog sync sweeps. | **magnitude** - sign ignored. Distance from `h` controls intensity. |
-| `2` | **Formant** | Sync + half-sine amplitude window - vocal "ah/oh" character. The window narrows with warp magnitude so high settings sound like a formant burst. | **magnitude** - sign ignored. |
-| `3` | **Squeeze** | Asymmetric phase stretch - moves the pivot away from centre. | **bipolar** - below `h` squeezes the start (pivot → 0.1), above `h` squeezes the end (pivot → 0.9). |
-| `4` | **Fold** | Phase modulation by a sine. At low magnitude this gently bends the phase; at high magnitude the trajectory reverses direction twice per cycle, producing classic wavefolder-style harmonic richness. | **magnitude** - sign ignored. |
-| `5` | **Quantize** | Phase quantisation / staircase (128 steps near `h`, down to 2 steps at the extremes). Produces a bitcrush / square-wave reduction effect. | **magnitude** - sign ignored. |
+| Glyph | Mode | Domain | What it does | Slider behaviour |
+|-------|------|--------|--------------|------------------|
+| `0` | **Bend** | phase | Phase exponent (`power = 8^amount`). Stretches one half of the cycle and compresses the other. | **bipolar**, below `h` compresses the end (concave), above `h` compresses the start (convex). |
+| `1` | **Sync** | phase | Hard-sync slave at variable rate. Negative side interpolates 0.25× to 1× (glyph `8` lands exactly on 0.5×); positive side snaps to integer mults so each glyph above `h` is +1× (glyph `h+1` = 2×, `h+15` = 16×, `h+16` and beyond clamp to 16×). | **bipolar with positive-side snap**. |
+| `2` | **Formant** | phase + amp | Same Sync ratio as above plus a half-sine amplitude window for vocal "ah/oh" character. The window narrows with warp magnitude so high settings sound like a formant burst. | **bipolar**, identical snap to Sync. |
+| `3` | **Squeeze** | phase | Piecewise-linear pivot that shifts the cycle's midpoint. Both halves stay linear, only the slope rates diverge. | **bipolar**, below `h` shifts midpoint left (compress start), above `h` shifts right (compress end). |
+| `4` | **Fold** | amp | Wavefolder. Drives the output (up to 16× at extremes) and reflects anything past ±1. Positive side: symmetric triangle fold (Buchla-style buzz, all-odd harmonics). Negative side: DC-biased asymmetric fold (warm, vocal/cuica character with even harmonics on top of the odd ones). | **bipolar with two flavors**, sign picks character, magnitude controls drive. |
+| `5` | **Quantize** | amp | Bitcrush. Snaps the output to multiples of a step that grows with magnitude. Low: subtle stair-step. Mid: 5-level reduction. Extreme: near silence punctuated by impulses at the wavetable's peak excursions. | **magnitude**, sign ignored (both halves of the slider give the same effect). |
+| `6` | **Pulse** | phase | Split-cycle warp. Compresses the wavetable's first half into the left edge of the cycle and the second half into the right edge, holding the midpoint in between. Shape-aware: on sine produces "hump + flat 0 + hump", on saw produces "ramp + flat 0 + ramp", on square produces "+1 + 0 + -1". | **bipolar**, positive holds at the wavetable midpoint, negative holds at the cycle boundary (start/end of wavetable). |
 
 | # | Name | Polarity | Role |
 |---|------|----------|------|
 | 1 | ShapA | unipolar | Osc A wavetable selector (see mapping above). |
 | 2 | WarpA | bipolar | Warp depth/direction for Osc A. **`h` = no warp**, deflection in either direction engages the warp. The mode (above) decides whether sign matters. |
-| 3 | WrpMdA | discrete (0-5) | Warp mode for Osc A. |
+| 3 | WrpMdA | discrete (0-6) | Warp mode for Osc A. |
 | 4 | ShapB | unipolar | Osc B wavetable selector. Independent from ShapA, so you can layer e.g. Sine + Saw. |
 | 5 | WarpB | bipolar | Warp depth/direction for Osc B. Same semantics as WarpA. |
-| 6 | WrpMdB | discrete (0-5) | Warp mode for Osc B. Independent from WrpMdA - you can have Bend on A and Fold on B simultaneously. |
-| 7 | BPitch | unipolar | Osc B pitch offset above Osc A, **0 to +5 semitones** (same scale as Drifter). `0` = unison. |
+| 6 | WrpMdB | discrete (0-6) | Warp mode for Osc B. Independent from WrpMdA, so you can have Bend on A and Pulse on B simultaneously. |
+| 7 | BPitch | unipolar | Osc B pitch offset above Osc A, **1 semitone per glyph (0 to +35 semitones)**. `0` = unison, `7` = +7 semitones (perfect 5th), `c` (12) = +1 octave, `o` (24) = +2 octaves, `z` = +35 (~3 octaves). Only goes up. |
 | 8 | Xfade | bipolar | A/B crossfade. **`0` = Osc A only**, **`h` = equal mix**, **`y` = Osc B only**. |
 | 9 | Detune | unipolar | Unison detune + stereo spread combined. `0` = mono / no detune; magnitude raises both detune amount (up to ±25 cents) and the stereo width of the detuned copies. A second detuned voice of each oscillator pans opposite the original. |
 
 **Common combos:**
-- *Vintage square + fold lead*: ShapA `l` (square), WarpA `z`, WrpMdA `4` (Fold), Xfade `h`, Detune `4`.
+- *Buchla-buzz lead*: ShapA `l` (square), WarpA `z`, WrpMdA `4` (Fold positive), Xfade `h`, Detune `4`. Aggressive metallic timbre, all-odd harmonics.
+- *Vocal cuica pad*: ShapA `e` (tri), WarpA `4` (negative side), WrpMdA `4` (Fold negative), Detune `g`. Warmer asymmetric fold with even harmonics, hollow vocal character.
 - *Vocal formant pad*: ShapA `z` (saw), WarpA `t`, WrpMdA `2` (Formant), ShapB `e` (tri), WrpMdB `0` (Bend), Detune `g`.
-- *Bell-like quantised sine*: ShapA `0` (sine), WarpA `z`, WrpMdA `5` (Quantize) - produces metallic, bitcrushed inharmonic tones.
-- *Classic sync lead*: ShapA `z` (saw), WarpA `r` or `7`, WrpMdA `1` (Sync), Xfade `8`.
-- *Bend pulled both ways*: WrpMdA `0` (Bend) - try WarpA `0` (full concave) and WarpA `z` (full convex) on a saw to hear the bipolar character.
+- *Bitcrushed sine*: ShapA `0` (sine), WarpA `r`, WrpMdA `5` (Quantize). Mid-amount = 5-level stair-step reduction; push to `z` for near-silence with impulse spikes at the sine peaks.
+- *Pulse-width on sine*: ShapA `0` (sine), WrpMdA `6` (Pulse), sweep WarpA from `j` (positive, narrowing humps with growing flat zero) toward `y` (almost-silent flat with brief ±1 flicks). Negative side flips the hold to the boundary.
+- *Octave-up sync lead*: ShapA `z` (saw), WarpA `i` (h+1 = exactly 2×), WrpMdA `1` (Sync), Xfade `8`.
+- *Sub-octave sync*: ShapA `z` (saw), WarpA `8` (= exactly 0.5× mult), WrpMdA `1` (Sync). Slave runs half-speed, octave-down sync flavour.
+- *Bend pulled both ways*: WrpMdA `0` (Bend), try WarpA `0` (full concave) and WarpA `z` (full convex) on a saw to hear the bipolar character.
 
-> Filter tip: warp modes (especially Sync, Fold, Formant) generate a lot of high-frequency content. If FltCut is at the default `p` (~8 kHz) you'll hear maybe a third of what they actually produce - try sweeping FltCut up to `y` or `z` while auditioning warp settings.
+> Filter tip: warp modes (especially Sync, Fold, Formant, Pulse) generate a lot of high-frequency content. If FltCut is at the default `p` (~8 kHz) you'll hear maybe a third of what they actually produce, try sweeping FltCut up to `y` or `z` while auditioning warp settings.
 
-Character: modern digital wavetable. Can go from vintage-sounding (square + fold) to bell-like (sine + quantize) to vocal (saw + formant) without leaving one engine.
+Character: modern digital wavetable. Can go from vintage-sounding (square + fold) to bitcrushed (sine + quantize) to vocal (saw + formant or tri + Fold negative) to PWM-leaning (any shape + Pulse) without leaving one engine.
 
 ### BrokenFM (EngType 2)
 
@@ -1207,6 +1234,165 @@ The Bouncer (`&`) Rate port and the per-track LFO Rate slots (`L` / `N` / `P`) b
 
 - Most params (volume, pan, drive amount, sends, voice oscillator slots) have no extra DSP smoothing, so they receive the full LFO output up to ~120 Hz. At `z` (128 Hz) you'll hear genuine audio-rate stepping/buzz that's perfect for sound design.
 - Filter cutoff (`FltCut`) and resonance (`FltRes`) have a built-in ~5 ms anti-zipper smoother, so they receive ~−1 dB at 100 Hz and ~−3 dB at 200 Hz. `y` and `z` still produce audible movement on the filter, just with progressively reduced depth. Sometimes that's exactly the spongey-resonance sound you want.
+
+---
+
+## Scenes
+
+A grampus project holds **8 scene slots**. Each scene is a complete snapshot of the grid, all 8 tracks' params + LFO config, master params, BPM, TickRate, and Shuffle. The scene system itself (which scene is active, which one is queued, the quantize value) lives outside any single scene so it stays consistent as you move around.
+
+### Mental model
+
+> Think of a scene as the entire current state of your project. You have 8 of them. When you switch scenes, the music stays running but everything around it can change.
+
+Fresh projects boot with all 8 slots empty (no glyphs in the grid, factory tracks, 120 BPM, Normal tick rate). Edit anything while a scene is active and the changes accumulate on that slot. Switch to a different scene and your edits stay parked on the original slot, ready to come back the next time you swap to it.
+
+There's no explicit "save scene" gesture. The scene you're currently playing IS slot N at all times.
+
+### Visual states on the SCENES panel
+
+The master page has a SCENES panel at the bottom: 8 scene cells, plus a Quantize cell on the right. The cells use three independent visual signals so multiple states can stack:
+
+- **Brackets `[ ]`** mark the active scene (whose audio is playing right now).
+- **Inverted video** marks the focused cell (your cursor, when you've navigated into the panel from the master page rows above).
+- **Icon to the left of the number** shows that scene's play state:
+  - `▶` solid play: active scene during playback.
+  - `▷` hollow play: armed, waiting for the next quantize boundary to swap in.
+  - `-` dash: idle.
+
+| Cell appearance | What it means |
+|-----------------|---------------|
+| ` -1 `          | Scene 1 is idle, not active. |
+| `[-1]`          | Scene 1 is active, sequencer is stopped. |
+| `[▶1]`          | Scene 1 is active and playing. |
+| ` ▷1 `          | Scene 1 is armed (queued to swap in). |
+
+Cells whose scene has a fully empty grid render in an extra-dim shade so populated scenes pop visually. Reset a scene and its cell drops to that dim state immediately. Paste content into an empty scene and the cell brightens.
+
+A small **scene indicator** also lives at the top-right corner of the screen, visible from every page. It alternates between the active scene number and the armed scene number while a swap is pending, so you always know what's coming next without having to be on the master page.
+
+### Quantize
+
+One global setting. The same Quantize value applies to every scene transition.
+
+`Off / 8 / 16 / 24 / 32 / 48 / 64 / 96 / 128 / 256 / 512 / 1024 / 2048`
+
+Default = **32** ticks (2 bars at TickRate=Normal in 4/4). The default leans long enough that you can change your mind: if you arm a scene a beat early it still lands on the next bar boundary instead of immediately.
+
+Quantize is measured in ticks, not bars, so it follows the project's tempo and tick rate. Faster BPM = the same number of ticks elapses more quickly = scene swaps land sooner.
+
+### Where scene controls live
+
+| Surface | What it does |
+|---------|--------------|
+| Top-right corner indicator | Always visible. Shows the active scene number; alternates with the armed scene number when a swap is pending. |
+| Master page SCENES panel | The interactive surface. 8 scene cells + Quantize cell. Navigate into it from the rows above with arrow keys. |
+
+### Switching scenes
+
+| Action | Keyboard | Behavior |
+|--------|----------|----------|
+| Arm scene N | **Alt+1** through **Alt+8** | Queue scene N. Lands at the next quantize boundary if playing; lands instantly if stopped or if Quantize is `Off`. |
+| Cancel a pending arm | **Alt+N** where N is the currently active scene | Re-arming the active scene clears any pending swap. |
+
+When you arm a scene during playback, its cell shows `▷N` (hollow play) until the boundary fires; the moment it actually swaps, the icon flips to `▶N` and the brackets move with it.
+
+Changing Quantize while a swap is pending doesn't cause an instant swap. The pending arm just waits for the next genuine boundary under the new Quantize value.
+
+### Working with the SCENES panel
+
+From any cell on the master page, press Down repeatedly to walk down through the parameter rows. Past the last row, you enter the SCENES panel and land on Scene 1.
+
+Inside the panel:
+
+- **Left / Right** walk between the 8 scene cells and the Quantize cell.
+- **Up** exits the panel back to the row above (Master Out).
+- **Down** does nothing; you're already at the bottom.
+
+On a focused **scene cell**:
+
+- **ENTER** arms that scene.
+- **DELETE** (or Backspace) opens a "Reset scene N to defaults?" confirmation. Confirming wipes that scene back to factory state.
+
+On the focused **Quantize cell**:
+
+- **ENTER** does nothing.
+- **Edit + Left / Right** cycles the Quantize value by 1 step (down / up the table).
+- **Edit + Up / Down** cycles by 4 steps.
+
+"Edit" is the same modifier used everywhere else for parameter adjustments: **Shift+arrow** on a keyboard, the **Edit** button + arrow on the iPad on-screen keybar, and **South+D-pad** on the TrimUI Brick gamepad.
+
+### What carries across a scene swap
+
+The audio engine deliberately keeps these alive when scenes change so the swap feels musical rather than glitchy:
+
+- Notes that are still ringing keep ringing through their natural release.
+- Envelopes mid-stage continue from where they were.
+- LFO phase counters keep advancing. The new scene's LFO settings (waveform, rate, depth) take effect immediately, but phase doesn't reset.
+- The sequencer tick number is continuous across the whole session, which is what makes tick-quantized swaps line up to the beat.
+
+What does reset on swap (because it was tied to the old scene's grid):
+
+- LFO modulation routing cache.
+- In-flight `Z`-lerp interpolations.
+- Per-parameter "controlled by sequencer" flags.
+
+### Undo / redo across scenes
+
+Undo is one global timeline, capped at 100 entries. Each entry is a full snapshot of all 8 scenes captured right after a change.
+
+The crucial behavior: **undo never changes which scene you're looking at**. If you edit scene 0, swap to scene 5, edit scene 5, then press Cmd+Z three times, the undo walks back through the changes in reverse order, but your view stays on whatever scene you were on when you pressed undo. A toast appears each time announcing what was rolled back and which scene it touched: `UNDO  Grid Edit · Scene 5`, `UNDO  Master · Scene 1`, etc.
+
+Resetting a scene is undoable. The pre-reset state is captured as a snapshot, so Cmd+Z brings the whole scene back. Re-doing the reset re-runs it programmatically without re-asking for confirmation.
+
+Arming a scene is NOT undoable. It's a transport action like Play / Stop, not an edit.
+
+The undo timeline gets wiped whenever you load a project or start a new one. Mixing two projects' edits in one undo stack would be confusing.
+
+For held-key sweeps (knob twists, BPM nudges, anything that fires the same parameter rapidly), grampus collapses consecutive same-target edits within a 400 ms window into one undo entry. Sweeping a knob from 0 to 100 returns to 0 in a single Cmd+Z, not 100 micro-steps.
+
+### Copy, cut, and paste between scenes
+
+There are three separate clipboards in flight at any time, each scoped to a different unit of work:
+
+- **Sequencer clipboard** holds a region of grid cells.
+- **Track / panel clipboard** holds a track's parameter snapshot or just one panel of it.
+- **Scene clipboard** holds an entire scene (grid + tracks + master + tempo).
+
+The first two work the same way they always have: copy on one scene, swap to another scene, paste, you're done.
+
+The scene clipboard is new and triggers from the master page only, when a scene cell is focused on the SCENES panel:
+
+| Shortcut | Effect |
+|----------|--------|
+| Copy (Cmd+C / Ctrl+C / your gamepad's Copy combo) | Copies the focused scene's full state into the scene clipboard. Toast: `Scene N copied`. |
+| Cut  (Cmd+X / Ctrl+X) | Same as copy, but also resets the source scene to defaults. True "move" workflow: cut from scene 3, paste to scene 6, scene 3 ends up empty and scene 6 has the data. Toast: `Scene N cut`. |
+| Paste (Cmd+V / Ctrl+V) | Drops the scene clipboard onto the focused scene cell. Toast: `Pasted into scene N`. If the clipboard was never set, you get a `Clipboard empty` toast instead. |
+
+If you copy from a project and try to paste into a project of a different grid size, you'll see `Grid size mismatch. Try saving your old project with the new version before pasting`. This happens when you copy from a project that was saved before the grid size changed in a newer build; saving and reloading the source project is enough to bring it up to the current size.
+
+### Project files
+
+Project files (`.grampus`) carry all 8 scenes. The active scene index, the Quantize value, and the per-scene tempo settings (BPM, TickRate, Shuffle) all save and restore.
+
+Older project files (saved by previous versions of grampus) load cleanly: their content lands in scene 0, and scenes 1-7 come up empty. From there you can edit them, save again, and the file becomes a current-format project carrying all 8 scenes.
+
+If an old project was saved at a smaller grid size, loading it auto-grows the grid to the current default (256 wide × 128 tall) by padding with empty cells. Existing content stays where it was; nothing gets clipped.
+
+### iPad keybar
+
+The on-screen keybar's row 2 has 4 medium cells: **T−**, **T+**, **S−**, **S+**.
+
+- **T−** / **T+** cycle through the 9 instrument pages (Master + 8 tracks), wrapping at the ends.
+- **S−** / **S+** arm the previous / next scene.
+
+This row replaces the old per-track T1-T8 row. If you used to tap individual track cells, you'll now tap T+ a few times to walk through tracks. The trade-off frees up the row for scene controls, which previously had no touch surface at all.
+
+### TrimUI Brick gamepad
+
+The Brick doesn't have analog sticks; in their place are two dedicated buttons along the bottom edge of the screen that emit the standard `L3` / `R3` events. The **left   button (L3)** arms the previous scene; the **right   button (R3)** arms the next scene. Both wrap around the 8 slots.
+
+L1 and R1 still cycle through pages on solo press, so page navigation is unaffected.
 
 ---
 
