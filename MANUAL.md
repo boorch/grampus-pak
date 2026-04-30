@@ -1603,6 +1603,6 @@ cp launch.sh.bak launch.sh
 ### Troubleshooting
 
 - **"Mappings are identical, launch.sh already up to date."** SDL on your device happens to report exactly the same mapping that was already in launch.sh. Nothing to do; the original mapping was correct.
-- **"ERROR: Couldn't read a mapping from gamepad_config -l output."** Your device's joystick wasn't detected by SDL. Try unplugging/replugging any external controller (or rebooting the device) and re-run.
+- **"ERROR: Couldn't read a mapping from gamepad_config -l output."** SDL didn't detect any joystick at all on your device. At this point you're on your own to figure out what's wrong; this is well outside what Grampus can help with.
 - **Buttons still wrong after applying.** Your device might genuinely need a custom interactive walkthrough. Run `./probe_gamepad.sh -c 0` (SSH only) for the full prompt-by-prompt mapper, then manually paste the resulting string into `launch.sh`'s `SDL_GAMECONTROLLERCONFIG=` line.
 - **Want to verify what SDL actually sees?** Run `./probe_gamepad.sh -l` (SSH). This shows the raw joystick + GameController info side by side, including the auto-detected mapping string.
