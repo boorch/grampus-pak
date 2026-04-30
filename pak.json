@@ -14,7 +14,7 @@
     "9 polyphonic synth engines including BoneSaw (JP-8000 SuperSaw) + per-track filter, drive, chorus, tone EQ",
     "10 filter modes including 3 Polivoks-inspired (PVox LP/HP/BP) with diode-pair bite",
     "8 tracks, 3 LFOs per track with audio-rate modulation, modulation matrix",
-    "17 ROM kits, 7 TAPE banks, 20 wavetables for WaveSurf",
+    "17 ROM kits, 7 TAPE banks, 36 wavetables for WaveSurf",
     "Master delay + reverse delay + reverb with shimmer",
     "WAV recording with automatic peak normalization to -3 dBFS",
     "Bundled demo projects, switchable themes per project"
