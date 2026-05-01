@@ -658,11 +658,15 @@ Persistent loadbang. Counts as an active bang for any orthogonal neighbour, but 
 
 ##### `|` - Reset Tick (self-clocked)
 
-Self-clocked Ctrl+R. Mirrors `D`'s `R|M` syntax: rate input west, modulo input east, no output. Fires every `R * M` ticks. **Modulo MUST be a non-zero explicit value** — unlike `D`, both empty (`.`) and `0` make `|` inert. `.` because nothing was specified; `0` because it'd otherwise duplicate `1`'s every-tick behaviour and is more useful as a bypass toggle. Rate defaults to 1 if missing. Same end state as a Ctrl+R press, but driven automatically every period instead of by a manual press:
+Self-clocked Ctrl+R. Rate and modulo inputs work the same way as `D`: `R|M` fires every `R * M` ticks (rate input west, modulo input east, rate defaults to 1). Each time it fires, the sequencer's tick counter snaps back to 0 and all FREE/TRIG LFOs reset their phase. Same end state as a Ctrl+R press, applied periodically.
+
+The one divergence from `D`: the modulo input is required and non-zero. Both empty (`.`) and `0` make `|` inert, so `|0` works as a single-character bypass without removing the cell. No output cell.
+
+Per-firing details:
 
 - Audio engine's `tick_number` snaps to 0 between this tick and the next.
 - All FREE / TRIG LFOs jump to phase 0 and clear their scope buffers; ONCE LFOs are intentionally untouched.
-- Sample-based things (sustained note tails, strum scheduler, ROMpler humanize lag) continue uninterrupted — the reset is musical-time only.
+- Sample-based things (sustained note tails, strum scheduler, ROMpler humanize lag) continue uninterrupted; the reset is musical-time only.
 - The sequencer's `current_tick` ALSO snaps to 0 in the **pre-pass**, so every other operator on the firing tick observes the reset value from the start. A `C8` next to a firing `|4` reads `tick=0` and outputs `0`, not `4`.
 
 | Operator | Inputs | Behaviour |
