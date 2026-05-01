@@ -65,7 +65,8 @@ Grid (sequencer)
        │  notes / parameter changes
        ▼
 8 synth tracks (T1..T8)
-  each track: voice → envelope → filter → drive → per-track compressor
+  each track: voice → envelope → filter → per-track compressor → tilt EQ
+                                          → drive → flanger → chorus
                                                      ↓
                                          pan + volume → sends
                                                      ↓
@@ -648,6 +649,32 @@ Locks every cell to its right up to the next `#` on the same row (or end of row)
 
 Transient activation signal. Auto-clears one tick after it is placed or produced.
 
+##### `@` - Loadbang
+
+Persistent loadbang. Counts as an active bang for any orthogonal neighbour, but **only on tick 0**. After tick 0 it is inert (no effect, doesn't bang neighbours). Two ways to make it fire again:
+
+- Press **Ctrl+R** (or R2 tap on the Brick) to reset the global tick counter to 0. Every `@` in the grid is a "live" bang on the next tick.
+- Place `@` somewhere on a **scene's grid**. Whenever the user jumps to that scene, Grampus auto-runs a tick reset (same effect as Ctrl+R: tick → 0, FREE/TRIG LFOs snap to phase 0, ONCE LFOs untouched). This is the opt-in mechanism for SONG-style scene chains where each section should start from a fresh transport state. Scenes with no `@` swap with no reset (continuous tick / LFO motion across the boundary).
+
+##### `|` - Reset Tick (self-clocked)
+
+Self-clocked Ctrl+R. Mirrors `D`'s `R|M` syntax: rate input west, modulo input east, no output. Fires every `R * M` ticks. **Modulo MUST be a non-zero explicit value** — unlike `D`, both empty (`.`) and `0` make `|` inert. `.` because nothing was specified; `0` because it'd otherwise duplicate `1`'s every-tick behaviour and is more useful as a bypass toggle. Rate defaults to 1 if missing. Same end state as a Ctrl+R press, but driven automatically every period instead of by a manual press:
+
+- Audio engine's `tick_number` snaps to 0 between this tick and the next.
+- All FREE / TRIG LFOs jump to phase 0 and clear their scope buffers; ONCE LFOs are intentionally untouched.
+- Sample-based things (sustained note tails, strum scheduler, ROMpler humanize lag) continue uninterrupted — the reset is musical-time only.
+- The sequencer's `current_tick` ALSO snaps to 0 in the **pre-pass**, so every other operator on the firing tick observes the reset value from the start. A `C8` next to a firing `|4` reads `tick=0` and outputs `0`, not `4`.
+
+| Operator | Inputs | Behaviour |
+|:--------:|:-------|:----------|
+| `R\|M` | west: rate (default 1), east: modulo (**required, non-zero**, `.` or `0` = inert) | Every `R*M` ticks, snap `current_tick = 0` and reset audio tick + LFO phases. No output. |
+
+Examples: `\|4` = reset every 4 ticks, `\|8` = every 8 ticks, `2\|4` = every 8 ticks with rate=2. `\|.` and `\|0` are inert — handy for toggling reset on/off without deleting the operator.
+
+Why self-clocked instead of bang-driven: a `D` source writes its `*` during main pass, so a bang-driven `\|` could only react mid-tick. That left a choice between letting `D` re-fire under the reset (phantom hits) or letting the bang tick get consumed as an extra audio frame (cycle = N+1 instead of N, plus boundary collisions when `D`'s modulo lined up with a drum's clock period). Self-clocked detection happens in the **pre-pass** before any other operator runs, so the reset tick IS tick 0 of the new cycle from the start. `D4` + `\|4` produces a clean 4-tick cycle for any drum length, with no row-major position dependency.
+
+Gated on `tick > 0` so there's no spurious reset at startup (`0 % anything == 0`).
+
 ---
 
 **Lowercase `d`, `u`, `f`** use a special "bang excluding south" rule: they ignore a bang arriving from the south, so their own south-facing bang output can't feed back into themselves and cause self-sustaining loops.
@@ -830,8 +857,10 @@ Sample-playback engine. Drum kits and pitched instruments share the same 6-param
 | 2 | Pitch | Coarse tune ±17 semitones (1 base-36 step = 1 semitone). |
 | 3 | Tune | Fine tune ±50 cents. |
 | 4 | Reverse | 0 = forward, 1 = reversed playback. |
-| 5 | VelCut | Velocity → filter cutoff modulator. Bipolar. `h` = no effect. Stacks with FltCut, FEnvAm, and any LFOs that target FltCut. |
+| 5 | VelCut | Velocity to filter cutoff modulator. Bipolar. `h` = no effect. Stacks with FltCut, FEnvAm, and any LFOs that target FltCut. |
 | 6 | 8bit | 0 = clean, 1 = quantise output to 8-bit (256 levels). Live bitcrush, applied AFTER pitch shifting so it crunches the audible signal, not the source data. |
+| 7 | Time Lag | Per-note timing humanization. `0` = exact (no delay). At `z` (max), each note-on is deferred by a fresh uniform random delay in `[0, 50%]` of one tick; the delay scales linearly with the slot value. Each note rolls fresh, so repeated notes drift independently. Use it to loosen up rigid sequencer patterns or to micro-shuffle drum hits. |
+| 8 | RandVelo | Per-note velocity humanization. `0` = exact velocity passthrough. At `z` (max), incoming velocity is multiplied by a fresh uniform random factor in `[0.01, 1.0]`; at `h` the factor is in `[~0.5, 1.0]`. Output is never silent (always at least velocity 1). Use it for ghost-note dynamics on hats, accents on chords, or general "human player" feel. Independent of Time Lag, both can run simultaneously. |
 
 Note-off behaviour depends on the kit:
 - **Drum / one-shot kits**: note-off is ignored, the sample plays through. If you want the tail cut, use the Amp envelope (`AmpHld` / `AmpDcy`).
@@ -862,6 +891,19 @@ The intent is to keep two independent sample banks that you can mix and match pe
 | 6 | FLUTE | Flute, looped |
 
 The TAPE selector and ROM selector are independent, adding a TAPE never bumps a ROM index, and vice versa.
+
+LoFiTron diverges from ROMpler on slots 7 and 8: it carries a per-track tape-emulation chain instead of ROMpler's humanization pair. Slots 1-6 are identical to ROMpler.
+
+| # | Name | Role |
+|---|------|------|
+| 1 | TAPE | Tape selector (replaces ROMpler's ROM). |
+| 2 | Pitch | Same as ROMpler. |
+| 3 | Tune | Same as ROMpler. |
+| 4 | Reverse | Same as ROMpler. |
+| 5 | VelCut | Same as ROMpler. |
+| 6 | 8bit | Same as ROMpler. |
+| 7 | Tape Age | Per-track tape-emulation chain: WOW (slow random-target glide pitch wobble) + Flutter (faster vibrato, gated above the mid-point) + Hiss (a baked stereo tape-noise loop, played with per-track decorrelated read offsets so multiple LoFiTron tracks don't lock in sync). Quadratic curve so the early range stays subtle and the upper range really commits to the tape character. `0` = bypass (no DSP cost). |
+| 8 | RndSpeed | Mellotron-style per-voice random pitch offset. Each note-on rolls a fresh `±25 cents` × `(value/35)` detune that sticks for the voice's lifetime, simulating the speed variance between a Mellotron's per-key tape motors. Independent per voice, so chord triggers detune each note separately. `0` = perfectly in tune. Pre WOW/Flutter (the per-track Tape Age modulation runs on top of the per-voice detune). |
 
 ---
 
@@ -985,6 +1027,7 @@ Every voice, regardless of type, passes through the same chain:
   > **About the PVox family.** Inspired by the Soviet Formanta Polivoks - a synth famous for the snarling vocal "bite" of its filter. The defining feature is an **asymmetric diode-pair feedback path** that replaces the linear resonance loop of a normal SVF. At low FltRes the filter is gentle and clean; as you push FltRes up, the feedback path saturates harder and harder, FltRes acts as both Q **and** drive at the same time. The asymmetric clipping shape leaks even-order harmonics into the resonance, which is what produces the singing, almost-vocal quality. Past about FltRes `r` the filter starts to overtly distort - this is the "bite". Internally 2x oversampled around the nonlinear core to keep aliasing out of the saturation; loudness is auto-compensated post-filter so cranking FltRes gets gnarly without getting unmanageably loud. Try it on saw leads, plucks, and anything with rich high-frequency content - it transforms ordinary patches into something with attitude.
 - **Filter envelope** (params 16-19: FEnvAm / FEnvAt / FEnvHl / FEnvDc) - bipolar amount, modulates filter cutoff in normalized space. Only triggers when amount ≠ 0. Atk/Hld/Dcy share the same time table as the amp envelope (see [Envelope time table](#envelope-time-table) below). Special case at FEnvAt=0: the filter envelope **truly snaps** to peak with no anti-click ramp (filter cutoff has no click risk, unlike amplitude), giving you instant Roland-style filter stabs.
 - **Per-track tilt EQ** (param 28: `S>Tone`) - bipolar one-pole tilt inserted right after the per-track compressor. `h` (centre) is bypass; values below `h` roll off highs (LP), values above roll off lows (HP). Same shape as the master Delay/Reverb tone controls. Useful for gentle per-track mix shaping (e.g. dipping the subs of a snare or trimming hiss off cymbals) without a separate FX module.
+- **Per-track stereo flanger** (param 26: `Q>Flanger`) - bipolar single-knob flanger inserted between drive and chorus. `h` (centre) is bypass. Both sides are classic feedback flangers (bipolar sine LFO, centre delay, recursive feedback path) sharing the same architecture; the only difference is the SIGN of the feedback, which determines the comb character. **Negative side** uses negative feedback for a notch comb / hollow / phaser-adjacent sweep with shorter delays (0.3-3 ms centre, 0-1.5 ms depth). **Positive side** uses positive feedback for a peak comb / metallic / classic jet swoosh with longer delays (0.5-5 ms centre, 0-2 ms depth). Wet mix ramps linearly from `h` to 50% over **4 base-36 steps on each side** then caps there (50% is the comb-filter sweet spot — going above weakens the cancellation). Depth and feedback both use quadratic curves so mid-range stays gentle (e.g. at `p` you get ~22% of max depth) and the very edges go full sound-design intensity (feedback nearly self-oscillating at `0` / `z`). LFO rate is **tick-based** (mirroring the LFO Rate model): cycle length scales from 24 ticks at the gentlest setting down to 0.0625 ticks (= 128 Hz audio-rate) on the last 2 glyphs of each side. Stereo width via 90° L/R LFO offset. Costs roughly the same as chorus per active track; bypassed tracks pay only a couple of compares.
 - **Per-track stereo chorus** (param 27: `R>Chorus`) - bipolar single-knob chorus inserted post-drive. `h` (centre) is bypass. **Negative side** ramps a "warm/Juno-style" chorus with **2.5/3.75/5/6.25 ms** base delays - tight, classic. **Positive side** ramps a "spacey" chorus with **10/15/20/25 ms** base delays - wider, more dispersed. Magnitude scales depth (up to ~4.8 ms LFO swing), rate (0.3-1.0 Hz), feedback (0-50%), and wet mix together, so one slider gives you a cohesive musical sound at any setting. Feedback ramps slightly faster than depth/rate so the resonant character builds in earlier - matches the mental model that pushing the slider further means more obvious chorus, not just louder dry-vs-wet. Internally: 4 LFO-modulated taps 90° apart, ~110 Hz HPF on the wet path keeps bass mono and out of the feedback loop. Costs ~2% of one CPU core per active track at 48 kHz; bypassed tracks are essentially free.
 - **Drive** (params 29 / 30: DrvMdl / Drive amount) - 11 modes, see the [Drive models](#drive-models) section below for the full breakdown.
 - **Sends** (params 31-33): DlySnd, RDlSnd, RevSnd - per-track wet amounts to the master buses.
