@@ -498,7 +498,7 @@ For `=`, an empty chord port = `0 12 24` (Octaves stack: root + 1 oct + 2 oct).
 | 32 | `w` / `W` | Major 6/9 | 0 4 7 9 14 | 4 7 9 14 12 |
 | 33 | `x` / `X` | Minor 6/9 | 0 3 7 9 14 | 3 7 9 14 12 |
 | 34 | `y` / `Y` | Minor11 | 0 3 7 10 17 | 3 7 10 17 12 |
-| 35 | `z` / `Z` | Minor7♭5 | 0 3 6 10 | 3 6 10 12 |
+| 35 | `z` / `Z` | Major11 (no 3rd) | 0 7 11 14 17 | 7 11 14 17 12 |
 
 For `=` the inverted chord is voiced ascending (notes never overlap), so the result is always a clean stacked chord. For `$` walking degrees 0..N produces those intervals as a sequential melody: degree 0 plays the new bass, and the wrapped-back original root plays an octave higher than root position would.
 
@@ -548,7 +548,7 @@ For chord glyphs (10-35): lowercase = root position, **UPPERCASE = first inversi
 | 32 | `w` / `W` | Chord: Major 6/9 | 0 4 7 9 14 | 4 7 9 14 12 |
 | 33 | `x` / `X` | Chord: Minor 6/9 | 0 3 7 9 14 | 3 7 9 14 12 |
 | 34 | `y` / `Y` | Chord: Minor11 | 0 3 7 10 17 | 3 7 10 17 12 |
-| 35 | `z` / `Z` | Chord: Minor7♭5 | 0 3 6 10 | 3 6 10 12 |
+| 35 | `z` / `Z` | Chord: Major11 (no 3rd) | 0 7 11 14 17 | 7 11 14 17 12 |
 
 ---
 
