@@ -1455,11 +1455,12 @@ Every track's dry signal sums into the master bus, and each track also feeds thr
   - **Below `h` (`0..g`)**: **power-chord shimmer**. Grains randomly pitched at base, +fifth (1.5× rate), or +octave (2× rate). Gives a chord-stack flavour because the fifth + octave + root sound together inside the grain cloud, like a ghosted power chord trailing the dry signal.
 - **Tape Noise + Vinyl Dust** - two always-on stereo loops mixed into the master sum. Each has its own gain (master params `X TapeNois` / `Y VinylDst`); `0` = silent. The loops keep playing even when their gain is `0`, so automating `!X` or `!Y` from the grid never restarts them mid-loop.
 - **FAT compressor** - one-knob bus compressor (Compress param). The single amount control simultaneously drives threshold, ratio, attack, release, and makeup gain along musical curves so `o` (`~70%`) gives instant glue and `z` pumps hard. Default is `o` for ready-to-go cohesion.
+- **Sidechain on the FAT comp** - two extra master params (`SCSrc`, `SCFilt`) turn the bus compressor into a proper ducker. `SCSrc` = `0` keeps the legacy behaviour (the comp keys off the master mix via its internal HP); `SCSrc` = `1..=8` routes that track's post-fader signal into the detector AND simultaneously around the comp itself, so the SC source plays clean while the rest of the mix pumps under it (classic kick-on-bass ducking, applied across the whole bus). `SCFilt` is a 24 dB/oct biquad cascade on the detection signal only, bipolar around `h` = bypass: below `h` a low-pass sweeps from 20 Hz at `0` to 4 kHz at `g` (sub / bass triggers, kick sidechain); above `h` a high-pass sweeps from 4 kHz at `i` to 16 kHz at `z` (highs / transients trigger, snare or hat sidechain). Phase-safe by construction (no filter ever touches the audio path of the SC source). Switching `SCSrc` via `!` is click-free thanks to a 5 ms routing cross-fade.
 - **Safety limiter** - fixed brick-wall limiter at the very end of the chain. Catches stray peaks before output. No user controls.
 
 Each track also runs its own light per-track compressor before the master bus to tame polyphonic stacking, so loud chords don't slam the FAT compressor into pumping unintentionally.
 
-The Master page lays out as three stacked panels - Delay, Reverb, and Mst Gain / Tape / Vinyl / Compress - each with parameters on the left and a live visualization on the right. The visualizations: stereo tap echoes (delay), particle-wash diffusion (reverb), and a scrolling input-level + gain-reduction meter (master).
+The Master page lays out as three stacked panels - Delay, Reverb, and Mst Gain / Sidechain / Tape / Vinyl / Compress - each with parameters on the left and a live visualization on the right. The visualizations: stereo tap echoes (delay), particle-wash diffusion (reverb), and a scrolling input-level + gain-reduction meter (master). A separate single-row post-comp / pre-limiter level meter sits directly under the Compress row in the Master Out panel: 12-cell green / yellow / red bar with sub-cell precision and a dB readout, peak-held over the last ~100 ms so it stays readable at audio rates.
 
 ---
 
@@ -1490,6 +1491,8 @@ The sequencer and the synth share one language: **36 base-36 parameter slots per
 | 0 | MstGain |
 | 1-6 | DlyTime / DlyFdbk / DlyTone / DlyMod / DlyGrn / Dly→Rvb |
 | 10-15 | RvbSize / RvbDcay / RvbDiff / RvbMod / RvbTone / RvbShim |
+| 31 | SCSrc (FAT comp sidechain source: 0 = off, 1-8 = track index) |
+| 32 | SCFilt (FAT comp sidechain filter: bipolar, h = bypass, < h = LP, > h = HP) |
 | 33 | TapeNois (always-on tape hiss loop, 0..0.125) |
 | 34 | VinylDst (always-on vinyl crackle loop, 0..0.125) |
 | 35 | Compress (FAT compressor amount) |
